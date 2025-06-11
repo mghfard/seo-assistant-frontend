@@ -10,10 +10,29 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 2rem 0; }
         .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 90%; max-width: 600px; text-align: center; }
         h1 { color: #4a4a4a; }
-        .upload-area { border: 2px dashed #007acc; padding: 2rem; border-radius: 8px; margin-bottom: 1rem; cursor: pointer; }
+
+        /* --- بخش اصلاح شده --- */
+        #seo-form {
+            display: flex;
+            flex-direction: column; /* چیدمان عمودی */
+            align-items: center;   /* مرکز چین کردن آیتم‌ها */
+            gap: 1rem;             /* فاصله بین آیتم‌ها */
+            margin-top: 1.5rem;    /* فاصله از پاراگراف بالا */
+        }
+
+        .upload-area { 
+            border: 2px dashed #007acc; 
+            padding: 2rem; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            width: 100%; 
+            box-sizing: border-box; 
+        }
+        /* --- پایان بخش اصلاح شده --- */
+
         .upload-area p { margin: 0; }
         input[type="file"] { display: none; }
-        button { background-color: #007acc; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; }
+        button { background-color: #007acc; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; width: auto; }
         button:hover { background-color: #005f99; }
         #status { margin-top: 1.5rem; padding: 1rem; background-color: #eef; border-radius: 4px; text-align: right; white-space: pre-wrap; line-height: 1.6; }
         .loader { display: none; margin: 1rem auto; border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 30px; height: 30px; animation: spin 2s linear infinite; }
@@ -48,10 +67,8 @@
         const submitBtn = document.getElementById('submit-btn');
         let briefData = null;
 
-        // !!! مهم: آدرس Worker خودتان را در اینجا قرار دهید
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
 
-        // فعال کردن دکمه آپلود وقتی فایل انتخاب شد
         fileInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -59,19 +76,18 @@
             fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
             loader.style.display = 'block';
             statusDiv.textContent = 'در حال خواندن فایل اکسل...';
+            submitBtn.disabled = true;
 
             try {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                // تبدیل شیت به فرمت JSON (هر ردیف یک آبجکت)
                 const jsonRows = XLSX.utils.sheet_to_json(worksheet);
 
-                // ما فرض می‌کنیم بریف ما در اولین ردیف شیت قرار دارد
                 if (jsonRows.length > 0) {
-                    briefData = jsonRows[0]; // اولین ردیف را به عنوان بریف در نظر می‌گیریم
-                    statusDiv.textContent = `بریف با موفقیت خوانده شد. موضوع: ${briefData.topic || 'نامشخص'}`;
+                    briefData = jsonRows[0];
+                    statusDiv.textContent = `بریف با موفقیت خوانده شد. موضوع: ${briefData.topic || 'نامشخص'}. برای ادامه کلیک کنید.`;
                     submitBtn.disabled = false;
                 } else {
                     throw new Error('فایل اکسل خالی است یا فرمت درستی ندارد.');
@@ -83,10 +99,8 @@
             }
         });
         
-        // جلوگیری از رفتار پیش‌فرض فرم
         form.addEventListener('submit', (e) => e.preventDefault());
 
-        // منطق اصلی هنگام کلیک روی دکمه تولید محتوا
         submitBtn.addEventListener('click', async () => {
             if (!briefData) {
                 statusDiv.textContent = 'لطفاً ابتدا یک فایل اکسل معتبر انتخاب کنید.';
@@ -98,11 +112,10 @@
             submitBtn.disabled = true;
 
             try {
-                // ارسال کل آبجکت بریف به Worker
                 const response = await fetch(WORKER_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(briefData) // ارسال کل بریف خوانده شده
+                    body: JSON.stringify(briefData)
                 });
 
                 if (!response.ok) {
@@ -113,12 +126,8 @@
                 const data = await response.json();
                 statusDiv.textContent = 'مقاله با موفقیت تولید شد! در حال آماده‌سازی برای دانلود...';
                 
-                // --- بخش جادویی: ساخت و دانلود فایل Word ---
-                // ما از فرمت HTML استفاده می‌کنیم چون Word آن را به خوبی می‌فهمد
                 let htmlContent = `<h1>${data.generated_title}</h1>`;
-                // در آینده می‌توانیم کل متن مقاله را هم به اینجا اضافه کنیم
-                // htmlContent += data.article_body; 
-
+                
                 const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
                     "xmlns:w='urn:schemas-microsoft-com:office:word' "+
                     "xmlns='http://www.w3.org/TR/REC-html40'>"+
@@ -134,7 +143,8 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                // --- پایان بخش جادویی ---
+                
+                statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد.";
 
             } catch (error) {
                 statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
@@ -144,7 +154,6 @@
             }
         });
 
-        // برای زیبایی بیشتر (کشیدن و رها کردن فایل)
         uploadLabel.addEventListener('dragover', (e) => e.preventDefault());
         uploadLabel.addEventListener('drop', (e) => {
             e.preventDefault();
