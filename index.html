@@ -13,7 +13,9 @@
         button { background-color: #007acc; color: white; border: none; cursor: pointer; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         .hidden { display: none; }
-        #status { margin-top: 1.5rem; padding: 1rem; background-color: #eef; border-radius: 4px; text-align: right; line-height: 1.6; }
+        #status, #results-area { margin-top: 1.5rem; padding: 1rem; background-color: #eef; border-radius: 4px; text-align: right; line-height: 1.7; }
+        #results-area ul { padding-right: 20px; }
+        #results-area strong { color: #005f99; }
         .loader { display: none; margin: 1rem auto; border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 30px; height: 30px; animation: spin 2s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -34,51 +36,42 @@
                 <label for="row-selector">۲. لطفا ردیف حاوی بریف را انتخاب کنید:</label>
                 <select id="row-selector"></select>
             </div>
-            <button id="submit-btn" disabled>تولید محتوا</button>
+            <button id="submit-btn" disabled>دریافت پیشنهاد عنوان</button>
         </div>
         
         <div class="loader" id="loader"></div>
         <div id="status"></div>
+        <div id="results-area" class="hidden"></div>
     </div>
 
     <script>
         const fileInput = document.getElementById('excel-file');
         const interactionArea = document.getElementById('interaction-area');
-        const sheetSelectorArea = document.getElementById('sheet-selector-area');
-        const rowSelectorArea = document.getElementById('row-selector-area');
         const sheetSelector = document.getElementById('sheet-selector');
         const rowSelector = document.getElementById('row-selector');
         const submitBtn = document.getElementById('submit-btn');
         const statusDiv = document.getElementById('status');
         const loader = document.getElementById('loader');
+        const resultsArea = document.getElementById('results-area');
         
-        let workbook;
-        let selectedSheetName;
-        let headers;
-        let allRows;
-
+        let workbook, selectedSheetName, headers, allRows;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
 
         fileInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
-
             statusDiv.textContent = 'در حال خواندن فایل اکسل...';
             loader.style.display = 'block';
             interactionArea.classList.add('hidden');
-
+            resultsArea.classList.add('hidden');
             try {
                 const data = await file.arrayBuffer();
                 workbook = XLSX.read(data);
-                
                 sheetSelector.innerHTML = '<option value="">-- انتخاب شیت --</option>';
                 workbook.SheetNames.forEach(name => {
                     sheetSelector.innerHTML += `<option value="${name}">${name}</option>`;
                 });
-
                 interactionArea.classList.remove('hidden');
-                rowSelectorArea.classList.add('hidden');
-                submitBtn.disabled = true;
                 statusDiv.textContent = 'فایل با موفقیت خوانده شد. لطفاً شیت و ردیف را انتخاب کنید.';
             } catch (error) {
                 statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`;
@@ -90,30 +83,23 @@
         sheetSelector.addEventListener('change', () => {
             selectedSheetName = sheetSelector.value;
             if (!selectedSheetName) {
-                rowSelectorArea.classList.add('hidden');
+                rowSelector.parentElement.classList.add('hidden');
                 submitBtn.disabled = true;
                 return;
             }
-
             const worksheet = workbook.Sheets[selectedSheetName];
-            // تبدیل شیت به آرایه‌ای از آرایه‌ها (برای حفظ ردیف‌های خالی)
             allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
             if (allRows.length < 2) {
-                statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف (یک ردیف عنوان و یک ردیف داده) ندارد.";
+                statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف ندارد.";
                 return;
             }
-
             headers = allRows[0];
             rowSelector.innerHTML = '<option value="">-- انتخاب ردیف --</option>';
-            // نمایش ردیف‌ها برای انتخاب (به جز ردیف اول که عنوان است)
             for (let i = 1; i < allRows.length; i++) {
-                // نمایش محتوای اولین سلول به عنوان پیش‌نمایش ردیف
                 const preview = allRows[i][0] || `ردیف ${i + 1}`;
                 rowSelector.innerHTML += `<option value="${i}">${preview}</option>`;
             }
-            
-            rowSelectorArea.classList.remove('hidden');
+            rowSelector.parentElement.classList.remove('hidden');
             submitBtn.disabled = true;
         });
 
@@ -127,11 +113,11 @@
                 statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.';
                 return;
             }
-
             const rowData = allRows[selectedRowIndex];
             
-            statusDiv.textContent = 'درخواست به دستیار هوشمند ارسال شد...';
+            statusDiv.textContent = 'درخواست به دستیار هوشمند ارسال شد... این فرآیند ممکن است کمی طول بکشد.';
             loader.style.display = 'block';
+            resultsArea.classList.add('hidden');
             submitBtn.disabled = true;
 
             try {
@@ -141,25 +127,29 @@
                     body: JSON.stringify({ headers: headers, rowData: rowData })
                 });
 
-                if (!response.ok) throw new Error(`خطای شبکه: ${response.status}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `خطای شبکه: ${response.status}`);
+                }
 
                 const data = await response.json();
-                statusDiv.textContent = 'نتیجه با موفقیت تولید شد! در حال آماده‌سازی برای دانلود...';
-                
-                let htmlContent = `<h1>${data.generated_title}</h1>`;
-                
-                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Generated Document</title></head><body>";
-                const footer = "</body></html>";
-                const source = header + htmlContent + footer;
+                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد.';
 
-                const fileBlob = new Blob([source], { type: 'application/msword' });
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(fileBlob);
-                link.download = `${rowData[0].replace(/ /g, '_') || 'generated-article'}.doc`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // --- بخش جدید: نمایش نتایج کامل در رابط کاربری ---
+                let resultsHTML = `
+                    <p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p>
+                    <hr>
+                    <p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p>
+                    <ul>
+                        ${data.source_titles.map(title => `<li>${title}</li>`).join('')}
+                    </ul>
+                    <hr>
+                    <p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p>
+                    <p>${data.ai_suggested_title}</p>
+                `;
+                resultsArea.innerHTML = resultsHTML;
+                resultsArea.classList.remove('hidden');
+                // --- پایان بخش جدید ---
 
             } catch (error) {
                 statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
@@ -168,7 +158,6 @@
                 submitBtn.disabled = false;
             }
         });
-
     </script>
 </body>
 </html>
