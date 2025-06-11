@@ -5,54 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>دستیار سئو Gemini</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
     <style>
-    :root {
-        --background-dark: #1a1a2e;
-        --surface-dark: #2a2a4e;
-        --primary-purple: #9b59b6;
-        --primary-purple-hover: #8e44ad;
-        --text-light: #ecf0f1;
-        --text-secondary: #bdc3c7;
-        --border-color: #4a4a6a;
-    }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--background-dark); color: var(--text-light); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 2rem 0; }
-    .container { background: var(--surface-dark); padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); width: 90%; max-width: 700px; text-align: center; border: 1px solid var(--border-color); }
-    h1 { color: white; }
-    p { color: var(--text-secondary); }
-    select, button, input[type="text"] { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 1rem; box-sizing: border-box; background-color: var(--background-dark); color: var(--text-light); }
-    button { background-color: var(--primary-purple); color: white; border: none; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
-    button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
-    button:hover:not(:disabled) { background-color: var(--primary-purple-hover); }
-    
-    /* --- کد اصلاح شده در اینجاست --- */
-    .upload-area { 
-        border: 2px dashed var(--primary-purple); 
-        padding: 1rem; /* کمی پدینگ را کم کردم */
-        min-height: 4rem; /* حداقل ارتفاع برای جلوگیری از بهم‌ریختگی */
-        display: flex; /* برای چینش بهتر محتوای داخلی */
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        border-radius: 8px; 
-        cursor: pointer; 
-        transition: background-color 0.3s; 
-    }
-    /* --- پایان اصلاح --- */
-
-    .upload-area:hover { background-color: #3a3a5e; }
-    .upload-area p { margin: 0; }
-    input[type="file"] { display: none; }
-    .hidden { display: none; }
-    #status, #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); }
-    #results-area ul { padding-right: 20px; }
-    #results-area strong { color: var(--primary-purple); }
-    #choice-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
-    .choice-option { display: flex; align-items: center; margin-bottom: 1rem; text-align: right; }
-    .choice-option input[type="radio"] { width: auto; margin-left: 10px; }
-    .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 2s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-</style>
+        :root {
+            --background-dark: #1a1a2e;
+            --surface-dark: #2a2a4e;
+            --primary-purple: #9b59b6;
+            --primary-purple-hover: #8e44ad;
+            --text-light: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border-color: #4a4a6a;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--background-dark); color: var(--text-light); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 2rem 0; }
+        .container { background: var(--surface-dark); padding: 2rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); width: 90%; max-width: 700px; text-align: center; border: 1px solid var(--border-color); }
+        h1 { color: white; }
+        p, label { color: var(--text-secondary); }
+        select, button, input[type="text"] { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 1rem; box-sizing: border-box; background-color: var(--background-dark); color: var(--text-light); }
+        button { background-color: var(--primary-purple); color: white; border: none; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
+        button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
+        button:hover:not(:disabled) { background-color: var(--primary-purple-hover); }
+        .upload-area { border: 2px dashed var(--primary-purple); padding: 1rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        .upload-area:hover { background-color: #3a3a5e; }
+        .upload-area p { margin: 0; }
+        input[type="file"] { display: none; }
+        .hidden { display: none; }
+        #status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); }
+        #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: #20203a; border-radius: 8px; text-align: right; line-height: 1.7; border: 1px solid var(--border-color); }
+        #results-area ul { padding-right: 20px; }
+        #results-area strong { color: var(--primary-purple); }
+        #results-area pre { text-align: right; white-space: pre-wrap; font-family: inherit; font-size: 1rem; }
+        #choice-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .choice-option { display: flex; align-items: center; margin-bottom: 1rem; text-align: right; }
+        .choice-option input[type="radio"] { width: auto; margin-left: 10px; }
+        .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -80,18 +66,18 @@
         <div class="loader" id="loader"></div>
         <div id="status"></div>
         <div id="results-area" class="hidden"></div>
-
+        
         <div id="choice-area" class="hidden">
-            <h3>۳. عنوان نهایی خود را انتخاب کنید:</h3>
+            <h3>۳. عنوان نهایی خود را انتخاب یا ویرایش کنید:</h3>
             <div class="choice-option">
                 <input type="radio" id="ai-choice" name="title_choice" value="ai" checked>
-                <label for="ai-choice">پذیرش عنوان پیشنهادی هوش مصنوعی</label>
+                <label for="ai-choice">استفاده از عنوان پیشنهادی هوش مصنوعی</label>
             </div>
             <div class="choice-option">
                 <input type="radio" id="custom-choice" name="title_choice" value="custom">
-                <label for="custom-choice">وارد کردن عنوان دلخواه</label>
+                <label for="custom-choice">ویرایش یا وارد کردن عنوان دلخواه</label>
             </div>
-            <input type="text" id="custom-title-input" class="hidden" placeholder="عنوان دلخواه خود را اینجا تایپ کنید...">
+            <input type="text" id="custom-title-input" class="hidden" placeholder="عنوان دلخواه خود را اینجا تایپ یا ویرایش کنید...">
             <button id="final-submit-btn">تایید عنوان و تولید سرفصل‌ها</button>
         </div>
     </div>
@@ -114,87 +100,15 @@
         const customChoiceRadio = document.getElementById('custom-choice');
         const customTitleInput = document.getElementById('custom-title-input');
         
-        let workbook, selectedSheetName, headers, allRows;
-        let aiSuggestedTitle = ''; // برای ذخیره عنوان پیشنهادی AI
-
+        let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
 
-        // Event Listeners برای فایل و انتخاب‌ها
-        fileInput.addEventListener('change', async (event) => { /* ... کد این بخش بدون تغییر است ... */ });
-        sheetSelector.addEventListener('change', () => { /* ... کد این بخش بدون تغییر است ... */ });
+        // Event Listeners برای فایل و انتخاب‌ها 
+        fileInput.addEventListener('change', handleFile);
+        sheetSelector.addEventListener('change', handleSheetSelect);
         rowSelector.addEventListener('change', () => { getSuggestionsBtn.disabled = !rowSelector.value; });
 
-        // Event Listener برای دکمه "دریافت پیشنهاد عنوان"
-        getSuggestionsBtn.addEventListener('click', async () => {
-            const selectedRowIndex = parseInt(rowSelector.value, 10);
-            if (isNaN(selectedRowIndex)) { statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.'; return; }
-            const rowData = allRows[selectedRowIndex];
-            
-            statusDiv.textContent = 'درخواست به دستیار هوشمند ارسال شد...';
-            loader.style.display = 'block';
-            resultsArea.classList.add('hidden');
-            choiceArea.classList.add('hidden');
-            getSuggestionsBtn.disabled = true;
-
-            try {
-                const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ headers: headers, rowData: rowData })
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `خطای شبکه: ${response.status}`);
-                }
-                const data = await response.json();
-                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد.';
-                aiSuggestedTitle = data.ai_suggested_title; // ذخیره پیشنهاد AI
-
-                let resultsHTML = `
-                    <p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p><hr style="border-color: var(--border-color);">
-                    <p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${data.source_titles.map(title => `<li>${title}</li>`).join('')}</ul><hr style="border-color: var(--border-color);">
-                    <p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
-                resultsArea.innerHTML = resultsHTML;
-                resultsArea.classList.remove('hidden');
-                choiceArea.classList.remove('hidden'); // نمایش بخش انتخاب نهایی
-            } catch (error) {
-                statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
-            } finally {
-                loader.style.display = 'none';
-                getSuggestionsBtn.disabled = false;
-            }
-        });
-
-        // منطق نمایش/مخفی کردن کادر متن عنوان دلخواه
-        aiChoiceRadio.addEventListener('change', () => customTitleInput.classList.add('hidden'));
-        customChoiceRadio.addEventListener('change', () => customTitleInput.classList.remove('hidden'));
-
-        // منطق دکمه نهایی "تایید و تولید سرفصل‌ها"
-        submitBtn.addEventListener('click', () => {
-            let final_approved_title = '';
-            if (aiChoiceRadio.checked) {
-                final_approved_title = aiSuggestedTitle;
-            } else if (customChoiceRadio.checked) {
-                final_approved_title = customTitleInput.value;
-            }
-
-            if (!final_approved_title) {
-                alert('لطفاً یک عنوان را انتخاب یا وارد کنید.');
-                return;
-            }
-
-            // در قدم بعدی، ما این final_approved_title را به همراه بریف به Worker ارسال می‌کنیم
-            // تا سرفصل‌ها را تولید کند.
-            alert(`عنوان نهایی تایید شد:\n\n${final_approved_title}\n\nدر مرحله بعد، این عنوان برای تولید سرفصل‌ها استفاده خواهد شد.`);
-            
-            // اینجا می‌توانید UI را برای مرحله بعد آماده کنید
-            statusDiv.textContent = `عنوان نهایی: "${final_approved_title}". آماده برای تولید سرفصل...`;
-            loader.style.display = 'block'; // مثلاً
-        });
-
-
-        // --- کدهای مربوط به خواندن فایل اکسل که بدون تغییر باقی می‌مانند ---
-        fileInput.addEventListener('change', async (event) => {
+        async function handleFile(event) {
             const file = event.target.files[0];
             if (!file) return;
             fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
@@ -212,14 +126,12 @@
                 });
                 interactionArea.classList.remove('hidden');
                 statusDiv.textContent = 'فایل با موفقیت خوانده شد. لطفاً شیت و ردیف را انتخاب کنید.';
-            } catch (error) {
-                statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`;
-            } finally {
-                loader.style.display = 'none';
-            }
-        });
-        sheetSelector.addEventListener('change', () => {
-            selectedSheetName = sheetSelector.value;
+            } catch (error) { statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`; } 
+            finally { loader.style.display = 'none'; }
+        }
+
+        function handleSheetSelect() {
+            const selectedSheetName = sheetSelector.value;
             if (!selectedSheetName) {
                 rowSelector.parentElement.classList.add('hidden');
                 getSuggestionsBtn.disabled = true;
@@ -227,22 +139,99 @@
             }
             const worksheet = workbook.Sheets[selectedSheetName];
             allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            if (allRows.length < 2) {
-                statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف ندارد.";
-                return;
-            }
+            if (allRows.length < 2) { statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف ندارد."; return; }
             headers = allRows[0];
             rowSelector.innerHTML = '<option value="">-- انتخاب ردیف --</option>';
             for (let i = 1; i < allRows.length; i++) {
                 const preview = allRows[i][0] || `ردیف خالی ${i + 1}`;
-                if (preview) { // فقط ردیف‌های خالی را نمایش نده
-                   rowSelector.innerHTML += `<option value="${i}">${preview}</option>`;
-                }
+                if (preview && preview.trim()) { rowSelector.innerHTML += `<option value="${i}">${preview}</option>`; }
             }
             rowSelector.parentElement.classList.remove('hidden');
             getSuggestionsBtn.disabled = true;
+        }
+
+        // --- وظیفه ۱: دریافت پیشنهاد عنوان ---
+        getSuggestionsBtn.addEventListener('click', async () => {
+            const selectedRowIndex = parseInt(rowSelector.value, 10);
+            if (isNaN(selectedRowIndex)) { statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.'; return; }
+            const rowData = allRows[selectedRowIndex];
+            briefData = { headers: headers, rowData: rowData };
+            
+            statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
+            loader.style.display = 'block';
+            resultsArea.classList.add('hidden');
+            choiceArea.classList.add('hidden');
+            getSuggestionsBtn.disabled = true;
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // --- این خط اصلاح شد ---
+                    body: JSON.stringify({ 
+                        task: 'get_title_suggestions', 
+                        brief: briefData 
+                    })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+                
+                const data = await response.json();
+                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
+                sourceTitles = data.source_titles; 
+                aiSuggestedTitle = data.ai_suggested_title;
+
+                let resultsHTML = `
+                    <p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p><hr style="border-color: var(--border-color);">
+                    <p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul><hr style="border-color: var(--border-color);">
+                    <p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
+                resultsArea.innerHTML = resultsHTML;
+                resultsArea.classList.remove('hidden');
+                choiceArea.classList.remove('hidden');
+                customTitleInput.value = aiSuggestedTitle; 
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
+            finally { loader.style.display = 'none'; getSuggestionsBtn.disabled = false; }
         });
 
+        // --- منطق UI برای انتخاب عنوان ---
+        aiChoiceRadio.addEventListener('change', () => customTitleInput.classList.add('hidden'));
+        customChoiceRadio.addEventListener('change', () => {
+            customTitleInput.classList.remove('hidden');
+            customTitleInput.focus();
+        });
+
+        // --- وظیفه ۲: تولید سرفصل‌ها ---
+        submitBtn.addEventListener('click', async () => {
+            let final_approved_title = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
+            if (!final_approved_title) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
+
+            statusDiv.textContent = `عنوان نهایی تایید شد. در حال ارسال درخواست برای تولید سرفصل...`;
+            loader.style.display = 'block';
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        task: 'generate_outline',
+                        brief: briefData,
+                        top_titles: sourceTitles,
+                        final_title: final_approved_title
+                    })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+
+                const data = await response.json();
+                
+                // نمایش سرفصل‌ها در ادامه نتایج قبلی
+                resultsArea.innerHTML += `<hr style="border-color: var(--border-color);">
+                    <h3>سرفصل‌های پیشنهادی:</h3>
+                    <pre>${data.generated_outline}</pre>`;
+                
+                statusDiv.textContent = "سرفصل‌ها با موفقیت تولید شد.";
+                choiceArea.classList.add('hidden'); 
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
+            finally { loader.style.display = 'none'; }
+        });
     </script>
 </body>
 </html>
