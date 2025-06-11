@@ -6,14 +6,63 @@
     <title>دستیار سئو Gemini</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { /* ... تمام استایل‌های قبلی بدون تغییر ... */ }
-        body { /* ... */ } .container { /* ... */ } h1,p,label,select,button,input[type="text"] { /* ... */ } button:disabled, button:hover:not(:disabled) { /* ... */ }
-        .upload-area { border: 2px dashed #9b59b6; padding: 1rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
-        .upload-area:hover { background-color: #3a3a5e; } .upload-area p { margin: 0; } input[type="file"] { display: none; } .hidden { display: none; }
-        #status, #results-area { /* ... */ } #results-area ul { /* ... */ } #results-area strong { /* ... */ }
+        :root {
+            --background-dark: #1a1a2e;
+            --surface-dark: #2a2a4e;
+            --primary-purple: #9b59b6;
+            --primary-purple-hover: #8e44ad;
+            --text-light: #ecf0f1;
+            --text-secondary: #bdc3c7;
+            --border-color: #4a4a6a;
+        }
+        /* --- بخش اصلاح شده و حیاتی --- */
+        html {
+            height: 100%;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--background-dark); 
+            color: var(--text-light); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100%; /* استفاده از min-height به جای height برای انعطاف‌پذیری */
+            margin: 0; 
+            padding: 2rem 0;
+            box-sizing: border-box;
+        }
+        /* --- پایان اصلاح --- */
+        .container { 
+            background: var(--surface-dark); 
+            padding: 2rem; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2); 
+            width: 90%; 
+            max-width: 700px; 
+            text-align: center; 
+            border: 1px solid var(--border-color);
+        }
+        h1 { color: white; }
+        p, label { color: var(--text-secondary); }
+        select, button, input[type="text"] { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 1rem; box-sizing: border-box; background-color: var(--background-dark); color: var(--text-light); }
+        button { background-color: var(--primary-purple); color: white; border: none; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
+        button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
+        button:hover:not(:disabled) { background-color: var(--primary-purple-hover); }
+        .upload-area { border: 2px dashed var(--primary-purple); padding: 1rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        .upload-area:hover { background-color: #3a3a5e; } 
+        .upload-area p { margin: 0; } 
+        input[type="file"] { display: none; } 
+        .hidden { display: none; }
+        #status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); }
+        #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: #20203a; border-radius: 8px; text-align: right; line-height: 1.7; border: 1px solid var(--border-color); }
+        #results-area ul { padding-right: 20px; } 
+        #results-area strong { color: var(--primary-purple); }
         #results-area pre { text-align: right; white-space: pre-wrap; font-family: inherit; font-size: 1rem; background-color: #1a1a2e; padding: 1rem; border-radius: 6px; }
         #choice-area, #final-action-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #4a4a6a; }
-        .choice-option { /* ... */ } .loader { /* ... */ } @keyframes spin { /* ... */ }
+        .choice-option { display: flex; align-items: center; margin-bottom: 1rem; text-align: right; }
+        .choice-option input[type="radio"] { width: auto; margin-left: 10px; }
+        .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -51,7 +100,7 @@
     </div>
 
     <script>
-        // تعریف متغیرهای UI و سراسری
+        // تمام کدهای جاوا اسکریپت قبلی بدون تغییر در اینجا قرار می‌گیرند
         const fileInput = document.getElementById('excel-file'),
               interactionArea = document.getElementById('interaction-area'),
               sheetSelector = document.getElementById('sheet-selector'),
@@ -72,7 +121,6 @@
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, generatedOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
 
-        // Event Listeners
         fileInput.addEventListener('change', handleFile);
         sheetSelector.addEventListener('change', handleSheetSelect);
         rowSelector.addEventListener('change', () => getSuggestionsBtn.disabled = !rowSelector.value);
@@ -82,9 +130,46 @@
         outlineSubmitBtn.addEventListener('click', generateOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
 
-        // توابع اصلی
-        async function handleFile(event) { /* ... کد این بخش بدون تغییر است ... */ }
-        function handleSheetSelect() { /* ... کد این بخش بدون تغییر است ... */ }
+        async function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
+            loader.style.display = 'block';
+            statusDiv.textContent = 'در حال خواندن فایل اکسل...';
+            interactionArea.classList.add('hidden');
+            resultsArea.classList.add('hidden');
+            choiceArea.classList.add('hidden');
+            finalActionArea.classList.add('hidden');
+            try {
+                const data = await file.arrayBuffer();
+                workbook = XLSX.read(data);
+                sheetSelector.innerHTML = '<option value="">-- انتخاب شیت --</option>';
+                workbook.SheetNames.forEach(name => { sheetSelector.innerHTML += `<option value="${name}">${name}</option>`; });
+                interactionArea.classList.remove('hidden');
+                statusDiv.textContent = 'فایل با موفقیت خوانده شد. لطفاً شیت و ردیف را انتخاب کنید.';
+            } catch (error) { statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`; } 
+            finally { loader.style.display = 'none'; }
+        }
+
+        function handleSheetSelect() {
+            const selectedSheetName = sheetSelector.value;
+            if (!selectedSheetName) {
+                rowSelector.parentElement.classList.add('hidden');
+                getSuggestionsBtn.disabled = true;
+                return;
+            }
+            const worksheet = workbook.Sheets[selectedSheetName];
+            allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            if (allRows.length < 2) { statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف ندارد."; return; }
+            headers = allRows[0];
+            rowSelector.innerHTML = '<option value="">-- انتخاب ردیف --</option>';
+            for (let i = 1; i < allRows.length; i++) {
+                const preview = allRows[i][0] || `ردیف خالی ${i + 1}`;
+                if (preview && preview.toString().trim()) { rowSelector.innerHTML += `<option value="${i}">${preview}</option>`; }
+            }
+            rowSelector.parentElement.classList.remove('hidden');
+            getSuggestionsBtn.disabled = true;
+        }
 
         async function getTitleSuggestions() {
             const selectedRowIndex = parseInt(rowSelector.value, 10);
@@ -141,12 +226,12 @@
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
 
                 const data = await response.json();
-                generatedOutline = data.generated_outline; // ذخیره سرفصل‌ها برای مرحله بعد
+                generatedOutline = data.generated_outline;
                 
                 resultsArea.innerHTML += `<hr style="border-color: var(--border-color);"><h3>سرفصل‌های پیشنهادی:</h3><pre>${generatedOutline}</pre>`;
-                statusDiv.textContent = "سرفصل‌ها با موفقیت تولید شد. برای تولید مقاله کامل روی دکمه نهایی کلیک کنید.";
+                statusDiv.textContent = "سرفصل‌ها با موفقیت تولید شد.";
                 choiceArea.classList.add('hidden'); 
-                finalActionArea.classList.remove('hidden'); // نمایش دکمه نهایی
+                finalActionArea.classList.remove('hidden');
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
             finally { loader.style.display = 'none'; }
         }
@@ -172,11 +257,10 @@
                 const data = await response.json();
                 statusDiv.textContent = 'مقاله کامل با موفقیت تولید شد! در حال آماده‌سازی فایل Word...';
 
-                // منطق دانلود فایل Word
-                let htmlContent = `<h1>${finalApprovedTitle}</h1>\n${data.generated_article.replace(/\n/g, '<br>')}`;
-                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Article</title></head><body>";
-                const footer = "</body></html>";
-                const source = header + htmlContent + footer;
+                let htmlContent = `<h1>${finalApprovedTitle}</h1>\n${data.generated_article.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}`;
+                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Article</title></head><body><div dir='rtl'>";
+                const footer = "</div></body></html>";
+                const source = header + `<p>${htmlContent}</p>` + footer;
                 const fileBlob = new Blob([source], { type: 'application/msword' });
                 
                 const link = document.createElement('a');
@@ -187,6 +271,7 @@
                 document.body.removeChild(link);
                 
                 statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد. پروژه به اتمام رسید!";
+                finalActionArea.classList.add('hidden');
 
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; }
             finally { loader.style.display = 'none'; generateArticleBtn.disabled = false; }
