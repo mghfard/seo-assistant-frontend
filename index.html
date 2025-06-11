@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دستیار سئو Gemini</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px B2px rgba(0,0,0,0.1); width: 90%; max-width: 600px; text-align: center; }
+        h1 { color: #4a4a4a; }
+        textarea { width: 100%; min-height: 100px; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 1rem; font-size: 1rem; box-sizing: border-box; }
+        button { background-color: #007acc; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #005f99; }
+        #result { margin-top: 1.5rem; padding: 1rem; background-color: #eef; border-radius: 4px; text-align: right; white-space: pre-wrap; line-height: 1.6; }
+        #result ul { padding-right: 20px; text-align: right; }
+        .loader { display: none; margin: 1rem auto; border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 دستیار محتوای سئو</h1>
+        <p>موضوع اصلی مقاله را وارد کنید تا یک عنوان پیشنهادی توسط Gemini دریافت کنید.</p>
+        <form id="seo-form">
+            <textarea id="topic" placeholder="مثلا: بهترین روش‌های یادگیری جاوا اسکریپت در سال 2025"></textarea>
+            <button type="submit">تولید عنوان</button>
+        </form>
+        <div class="loader" id="loader"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('seo-form');
+        const topicInput = document.getElementById('topic');
+        const resultDiv = document.getElementById('result');
+        const loader = document.getElementById('loader');
+
+        // !!! مهم: آدرس Worker خودتان را در اینجا قرار دهید
+        const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const topic = topicInput.value;
+            if (!topic) {
+                resultDiv.textContent = 'لطفاً یک موضوع وارد کنید.';
+                return;
+            }
+
+            resultDiv.innerHTML = '';
+            loader.style.display = 'block';
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic: topic })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `خطای شبکه: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                let displayText = `<strong>عنوان پیشنهادی:</strong><br>${data.generated_title}`;
+                
+                if (data.source_titles && data.source_titles.length > 0) {
+                    displayText += `<br><br><hr><strong>عناوین برتر یافت شده در گوگل (برای تحلیل):</strong><br><ul>`;
+                    data.source_titles.forEach(title => {
+                        displayText += `<li>${title}</li>`;
+                    });
+                    displayText += `</ul>`;
+                }
+                
+                resultDiv.innerHTML = displayText;
+
+            } catch (error) {
+                resultDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
+            } finally {
+                loader.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
