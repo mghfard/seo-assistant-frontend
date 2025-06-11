@@ -6,10 +6,6 @@
     <title>دستیار سئو Gemini</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
-
     <style>
         :root {
             --background-dark: #1e1e32;
@@ -24,17 +20,19 @@
         * {
             box-sizing: border-box;
         }
+        html {
+            height: 100%;
+        }
         body { 
-            /* اعمال فونت وزیرمتن به کل صفحه */
             font-family: 'Vazirmatn', sans-serif; 
             background-color: var(--background-dark); 
             color: var(--text-light); 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            min-height: 100vh; 
+            min-height: 100%;
             margin: 0; 
-            padding: 2rem;
+            padding: 2rem 0;
         }
         .container { 
             background: var(--surface-dark); 
@@ -61,7 +59,7 @@
         p, label { color: var(--text-secondary); }
         select, button, input[type="text"] { 
             width: 100%; 
-            padding: 0.7rem 1rem; /* پدینگ دکمه‌ها کوچک‌تر شد */
+            padding: 0.7rem 1rem;
             margin-bottom: 1rem; 
             border-radius: 8px; 
             border: 1px solid var(--border-color); 
@@ -76,8 +74,6 @@
              box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.3);
              outline: none;
         }
-
-        /* --- بازطراحی دکمه‌ها --- */
         button { 
             background-image: linear-gradient(45deg, var(--primary-purple), var(--primary-purple-light));
             color: white; 
@@ -98,9 +94,7 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             transform: translateY(-2px);
         }
-        /* --- پایان بازطراحی --- */
-
-        .upload-area { border: 2px dashed var(--primary-purple); padding: 1.5rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        .upload-area { border: 2px dashed var(--primary-purple); padding: 1.5rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; margin-top: 1.5rem; }
         .upload-area:hover { background-color: #3a3a5e; } 
         .upload-area p { margin: 0; } 
         input[type="file"] { display: none; } 
@@ -115,7 +109,6 @@
         .choice-option input[type="radio"] { width: auto; margin-left: 10px; }
         .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* انیمیشن برای ربات */
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
     </style>
 </head>
@@ -154,31 +147,33 @@
     </div>
 
     <script>
-        // تمام کدهای جاوا اسکریپت قبلی بدون تغییر در اینجا قرار می‌گیرند.
-        // ...
-        const fileInput = document.getElementById('excel-file'),
-              interactionArea = document.getElementById('interaction-area'),
-              sheetSelector = document.getElementById('sheet-selector'),
-              rowSelector = document.getElementById('row-selector'),
-              getSuggestionsBtn = document.getElementById('get-suggestions-btn'),
-              outlineSubmitBtn = document.getElementById('outline-submit-btn'),
-              generateArticleBtn = document.getElementById('generate-article-btn'),
-              statusDiv = document.getElementById('status'),
-              loader = document.getElementById('loader'),
-              resultsArea = document.getElementById('results-area'),
-              fileNameSpan = document.getElementById('file-name'),
-              choiceArea = document.getElementById('choice-area'),
-              aiChoiceRadio = document.getElementById('ai-choice'),
-              customChoiceRadio = document.getElementById('custom-choice'),
-              customTitleInput = document.getElementById('custom-title-input'),
-              finalActionArea = document.getElementById('final-action-area');
+        // تعریف تمام متغیرهای UI در ابتدای اسکریپت
+        const fileInput = document.getElementById('excel-file');
+        const interactionArea = document.getElementById('interaction-area');
+        const sheetSelector = document.getElementById('sheet-selector');
+        const rowSelector = document.getElementById('row-selector');
+        const getSuggestionsBtn = document.getElementById('get-suggestions-btn');
+        const outlineSubmitBtn = document.getElementById('outline-submit-btn');
+        const generateArticleBtn = document.getElementById('generate-article-btn');
+        const statusDiv = document.getElementById('status');
+        const loader = document.getElementById('loader');
+        const resultsArea = document.getElementById('results-area');
+        const fileNameSpan = document.getElementById('file-name');
+        const choiceArea = document.getElementById('choice-area');
+        const aiChoiceRadio = document.getElementById('ai-choice');
+        const customChoiceRadio = document.getElementById('custom-choice');
+        const customTitleInput = document.getElementById('custom-title-input');
+        const finalActionArea = document.getElementById('final-action-area');
         
+        // تعریف متغیرهای سراسری برای نگهداری وضعیت
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, generatedOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
 
-        fileInput.addEventListener('change', handleFile);
+        // --- Event Listeners ---
+        // این بخش فقط یک بار در ابتدا اجرا شده و Listener ها را ثبت می‌کند
+        fileInput.addEventListener('change', handleFileSelect);
         sheetSelector.addEventListener('change', handleSheetSelect);
-        rowSelector.addEventListener('change', () => getSuggestionsBtn.disabled = !rowSelector.value);
+        rowSelector.addEventListener('change', () => { getSuggestionsBtn.disabled = !rowSelector.value; });
         getSuggestionsBtn.addEventListener('click', getTitleSuggestions);
         aiChoiceRadio.addEventListener('change', () => customTitleInput.classList.add('hidden'));
         customChoiceRadio.addEventListener('change', () => {
@@ -187,10 +182,14 @@
         });
         outlineSubmitBtn.addEventListener('click', generateOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
+        
+        // --- توابع اجرایی ---
 
-        async function handleFile(event) {
+        async function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // ریست کردن UI به حالت اولیه
             fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
             loader.style.display = 'block';
             statusDiv.textContent = 'در حال خواندن فایل اکسل...';
@@ -198,19 +197,32 @@
             resultsArea.classList.add('hidden');
             choiceArea.classList.add('hidden');
             finalActionArea.classList.add('hidden');
+
             try {
                 const data = await file.arrayBuffer();
                 workbook = XLSX.read(data);
+                
                 sheetSelector.innerHTML = '<option value="">-- انتخاب شیت --</option>';
-                workbook.SheetNames.forEach(name => { sheetSelector.innerHTML += `<option value="<span class="math-inline">\{name\}"\></span>{name}</option>`; });
+                workbook.SheetNames.forEach(name => {
+                    sheetSelector.innerHTML += `<option value="${name}">${name}</option>`;
+                });
+
                 interactionArea.classList.remove('hidden');
+                rowSelector.parentElement.classList.add('hidden');
                 statusDiv.textContent = 'فایل با موفقیت خوانده شد. لطفاً شیت و ردیف را انتخاب کنید.';
-            } catch (error) { statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`; } 
-            finally { loader.style.display = 'none'; }
+            } catch (error) {
+                statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`;
+            } finally {
+                loader.style.display = 'none';
+            }
         }
 
         function handleSheetSelect() {
             const selectedSheetName = sheetSelector.value;
+            resultsArea.classList.add('hidden');
+            choiceArea.classList.add('hidden');
+            finalActionArea.classList.add('hidden');
+
             if (!selectedSheetName) {
                 rowSelector.parentElement.classList.add('hidden');
                 getSuggestionsBtn.disabled = true;
@@ -218,12 +230,17 @@
             }
             const worksheet = workbook.Sheets[selectedSheetName];
             allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            if (allRows.length < 2) { statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف ندارد."; return; }
+            if (allRows.length < 2) {
+                statusDiv.textContent = "شیت انتخاب شده حداقل دو ردیف (عنوان و داده) ندارد.";
+                return;
+            }
             headers = allRows[0];
             rowSelector.innerHTML = '<option value="">-- انتخاب ردیف --</option>';
             for (let i = 1; i < allRows.length; i++) {
-                const preview = allRows[i][0] || `ردیف خالی ${i + 1}`;
-                if (preview && preview.toString().trim()) { rowSelector.innerHTML += `<option value="<span class="math-inline">\{i\}"\></span>{preview}</option>`; }
+                const preview = allRows[i][0] || `ردیف ${i + 1}`;
+                if (preview && preview.toString().trim()) { 
+                    rowSelector.innerHTML += `<option value="${i}">${preview}</option>`;
+                }
             }
             rowSelector.parentElement.classList.remove('hidden');
             getSuggestionsBtn.disabled = true;
@@ -247,3 +264,84 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task: 'get_title_suggestions', brief: briefData })
                 });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+                
+                const data = await response.json();
+                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
+                sourceTitles = data.source_titles; 
+                aiSuggestedTitle = data.ai_suggested_title;
+
+                let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p><hr style="border-color: var(--border-color);"><p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul><hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
+                resultsArea.innerHTML = resultsHTML;
+                resultsArea.classList.remove('hidden');
+                choiceArea.classList.remove('hidden');
+                customTitleInput.value = aiSuggestedTitle; 
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
+            finally { loader.style.display = 'none'; getSuggestionsBtn.disabled = false; }
+        }
+
+        async function generateOutline() {
+            finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
+            if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
+
+            statusDiv.textContent = `عنوان نهایی تایید شد. در حال ارسال درخواست برای تولید سرفصل...`;
+            loader.style.display = 'block';
+            choiceArea.classList.add('hidden');
+            outlineSubmitBtn.disabled = true;
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: 'generate_outline', brief: briefData, top_titles: sourceTitles, final_title: finalApprovedTitle })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+
+                const data = await response.json();
+                generatedOutline = data.generated_outline;
+                
+                resultsArea.innerHTML += `<hr style="border-color: var(--border-color);"><h3>سرفصل‌های پیشنهادی:</h3><pre>${generatedOutline}</pre>`;
+                statusDiv.textContent = "سرفصل‌ها با موفقیت تولید شد. برای تولید مقاله کامل روی دکمه نهایی کلیک کنید.";
+                finalActionArea.classList.remove('hidden');
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
+            finally { loader.style.display = 'none'; }
+        }
+
+        async function generateFullArticle() {
+            statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد. این فرآیند طولانی‌ترین مرحله است، لطفاً صبور باشید...';
+            loader.style.display = 'block';
+            generateArticleBtn.disabled = true;
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: 'generate_article', brief: briefData, final_title: finalApprovedTitle, outline: generatedOutline })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+
+                const data = await response.json();
+                statusDiv.textContent = 'مقاله کامل با موفقیت تولید شد! در حال آماده‌سازی فایل Word...';
+
+                let htmlContent = `<h1>${finalApprovedTitle}</h1>\n${data.generated_article.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}`;
+                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Article</title></head><body><div dir='rtl'>";
+                const footer = "</div></body></html>";
+                const source = header + `<p>${htmlContent}</p>` + footer;
+                const fileBlob = new Blob([source], { type: 'application/msword' });
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(fileBlob);
+                link.download = `${finalApprovedTitle.replace(/[\\/:*?"<>|]/g, '').replace(/ /g, '_')}.doc`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد. پروژه به اتمام رسید!";
+                finalActionArea.classList.add('hidden');
+
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; }
+            finally { loader.style.display = 'none'; generateArticleBtn.disabled = false; }
+        }
+    </script>
+</body>
+</html>
