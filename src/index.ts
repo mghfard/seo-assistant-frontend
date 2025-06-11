@@ -1,23 +1,33 @@
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         
+        // تعریف هدرهای CORS برای اجازه دسترسی از هر دامنه‌ای
         const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type',
         };
 
+        // پاسخ به درخواست پیش‌پرواز (Pre-flight) برای CORS
         if (request.method === 'OPTIONS') {
             return new Response(null, { headers: corsHeaders });
         }
 
+        // فقط به درخواست‌های POST پاسخ می‌دهیم
         if (request.method === 'POST') {
             try {
-                const body: { topic?: string } = await request.json();
-                const topic = body.topic;
+                // حالا ما کل ردیف اکسل را به عنوان یک آبجکت JSON دریافت می‌کنیم
+                const brief: any = await request.json();
+                
+                // موضوع را از داخل آبجکت بریف استخراج می‌کنیم
+                // فایل اکسل شما باید حتما ستونی با عنوان "topic" داشته باشد
+                const topic = brief.topic;
 
                 if (!topic) {
-                    return new Response(JSON.stringify({ error: 'موضوعی دریافت نشد.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+                    return new Response(JSON.stringify({ error: 'ستون "topic" در فایل اکسل شما یافت نشد.' }), { 
+                        status: 400, 
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
                 }
 
                 console.log("Searching Google for top titles with Persian/Iran context...");
@@ -37,6 +47,7 @@ export default {
                     throw new Error("هیچ عنوانی از طریق جستجوی گوگل یافت نشد.");
                 }
 
+                // ساخت یک پرامپت هوشمندانه و باکیفیت برای Gemini
                 const richPrompt = `
                     You are a world-class SEO expert and copywriter.
                     A user wants a blog post title for the topic: "${topic}".
@@ -53,7 +64,6 @@ export default {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        // --- این خط اصلاح شد ---
                         contents: [{ parts: [{ text: richPrompt }] }]
                     })
                 });
@@ -66,6 +76,7 @@ export default {
                 const geminiData: any = await geminiResponse.json();
                 const generatedText = geminiData.candidates[0].content.parts[0].text;
                 
+                // ارسال پاسخ نهایی به مرورگر کاربر
                 return new Response(JSON.stringify({ 
                     generated_title: generatedText.trim(),
                     source_titles: topTitles 
@@ -82,10 +93,12 @@ export default {
             }
         }
 
+        // رد کردن سایر متدهای درخواست (مثل GET)
         return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
     },
 };
 
+// تعریف تایپ‌ها برای کلیدهای محرمانه ما
 interface Env {
     GEMINI_API_KEY: string;
     GOOGLE_API_KEY: string;
