@@ -5,50 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>دستیار سئو Gemini</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --background-dark: #1a1a2e;
+            --background-dark: #1e1e32;
             --surface-dark: #2a2a4e;
-            --primary-purple: #9b59b6;
-            --primary-purple-hover: #8e44ad;
-            --text-light: #ecf0f1;
-            --text-secondary: #bdc3c7;
+            --primary-purple: #8e44ad;
+            --primary-purple-light: #9b59b6;
+            --text-light: #f0f0f0;
+            --text-secondary: #a0a0c0;
             --border-color: #4a4a6a;
+            --shadow-color: rgba(0, 0, 0, 0.4);
         }
-        /* --- بخش اصلاح شده و حیاتی --- */
-        html {
-            height: 100%;
+        * {
+            box-sizing: border-box;
         }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            /* اعمال فونت وزیرمتن به کل صفحه */
+            font-family: 'Vazirmatn', sans-serif; 
             background-color: var(--background-dark); 
             color: var(--text-light); 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            min-height: 100%; /* استفاده از min-height به جای height برای انعطاف‌پذیری */
+            min-height: 100vh; 
             margin: 0; 
-            padding: 2rem 0;
-            box-sizing: border-box;
+            padding: 2rem;
         }
-        /* --- پایان اصلاح --- */
         .container { 
             background: var(--surface-dark); 
-            padding: 2rem; 
-            border-radius: 12px; 
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2); 
+            padding: 2.5rem; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px var(--shadow-color); 
             width: 90%; 
             max-width: 700px; 
             text-align: center; 
             border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
         }
-        h1 { color: white; }
+        h1 { 
+            color: white; 
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        h1 .robot {
+            animation: pulse 2s infinite ease-in-out;
+        }
         p, label { color: var(--text-secondary); }
-        select, button, input[type="text"] { width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 1rem; box-sizing: border-box; background-color: var(--background-dark); color: var(--text-light); }
-        button { background-color: var(--primary-purple); color: white; border: none; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
-        button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
-        button:hover:not(:disabled) { background-color: var(--primary-purple-hover); }
-        .upload-area { border: 2px dashed var(--primary-purple); padding: 1rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        select, button, input[type="text"] { 
+            width: 100%; 
+            padding: 0.7rem 1rem; /* پدینگ دکمه‌ها کوچک‌تر شد */
+            margin-bottom: 1rem; 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            font-size: 0.95rem; 
+            background-color: var(--background-dark);
+            color: var(--text-light);
+            font-family: 'Vazirmatn', sans-serif;
+            transition: all 0.3s ease;
+        }
+        select:focus, input[type="text"]:focus {
+             border-color: var(--primary-purple);
+             box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.3);
+             outline: none;
+        }
+
+        /* --- بازطراحی دکمه‌ها --- */
+        button { 
+            background-image: linear-gradient(45deg, var(--primary-purple), var(--primary-purple-light));
+            color: white; 
+            border: none; 
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:disabled { 
+            background-image: none;
+            background-color: #555; 
+            color: #999; 
+            cursor: not-allowed; 
+            box-shadow: none;
+        }
+        button:hover:not(:disabled) { 
+            background-image: linear-gradient(45deg, var(--primary-purple-hover), var(--primary-purple));
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            transform: translateY(-2px);
+        }
+        /* --- پایان بازطراحی --- */
+
+        .upload-area { border: 2px dashed var(--primary-purple); padding: 1.5rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
         .upload-area:hover { background-color: #3a3a5e; } 
         .upload-area p { margin: 0; } 
         input[type="file"] { display: none; } 
@@ -56,18 +108,20 @@
         #status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); }
         #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: #20203a; border-radius: 8px; text-align: right; line-height: 1.7; border: 1px solid var(--border-color); }
         #results-area ul { padding-right: 20px; } 
-        #results-area strong { color: var(--primary-purple); }
+        #results-area strong { color: var(--primary-purple-light); }
         #results-area pre { text-align: right; white-space: pre-wrap; font-family: inherit; font-size: 1rem; background-color: #1a1a2e; padding: 1rem; border-radius: 6px; }
-        #choice-area, #final-action-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #4a4a6a; }
-        .choice-option { display: flex; align-items: center; margin-bottom: 1rem; text-align: right; }
+        #choice-area, #final-action-area { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .choice-option { display: flex; align-items: center; margin-bottom: 1rem; text-align: right; justify-content: flex-start; }
         .choice-option input[type="radio"] { width: auto; margin-left: 10px; }
-        .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        .loader { display: none; margin: 1rem auto; border: 4px solid #444; border-radius: 50%; border-top: 4px solid var(--primary-purple); width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* انیمیشن برای ربات */
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🤖 دستیار محتوای سئو</h1>
+        <h1><span class="robot">🤖</span> دستیار محتوای سئو</h1>
         <p>فایل اکسل حاوی تقویم محتوایی خود را آپلود کنید.</p>
         <label for="excel-file" class="upload-area"><p>برای انتخاب فایل اینجا کلیک کنید</p><small id="file-name"></small></label>
         <input type="file" id="excel-file" accept=".xlsx, .xls">
@@ -100,7 +154,8 @@
     </div>
 
     <script>
-        // تمام کدهای جاوا اسکریپت قبلی بدون تغییر در اینجا قرار می‌گیرند
+        // تمام کدهای جاوا اسکریپت قبلی بدون تغییر در اینجا قرار می‌گیرند.
+        // ...
         const fileInput = document.getElementById('excel-file'),
               interactionArea = document.getElementById('interaction-area'),
               sheetSelector = document.getElementById('sheet-selector'),
@@ -126,7 +181,10 @@
         rowSelector.addEventListener('change', () => getSuggestionsBtn.disabled = !rowSelector.value);
         getSuggestionsBtn.addEventListener('click', getTitleSuggestions);
         aiChoiceRadio.addEventListener('change', () => customTitleInput.classList.add('hidden'));
-        customChoiceRadio.addEventListener('change', () => customTitleInput.classList.remove('hidden'));
+        customChoiceRadio.addEventListener('change', () => {
+            customTitleInput.classList.remove('hidden');
+            customTitleInput.focus();
+        });
         outlineSubmitBtn.addEventListener('click', generateOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
 
@@ -144,7 +202,7 @@
                 const data = await file.arrayBuffer();
                 workbook = XLSX.read(data);
                 sheetSelector.innerHTML = '<option value="">-- انتخاب شیت --</option>';
-                workbook.SheetNames.forEach(name => { sheetSelector.innerHTML += `<option value="${name}">${name}</option>`; });
+                workbook.SheetNames.forEach(name => { sheetSelector.innerHTML += `<option value="<span class="math-inline">\{name\}"\></span>{name}</option>`; });
                 interactionArea.classList.remove('hidden');
                 statusDiv.textContent = 'فایل با موفقیت خوانده شد. لطفاً شیت و ردیف را انتخاب کنید.';
             } catch (error) { statusDiv.textContent = `خطا در خواندن فایل اکسل: ${error.message}`; } 
@@ -165,7 +223,7 @@
             rowSelector.innerHTML = '<option value="">-- انتخاب ردیف --</option>';
             for (let i = 1; i < allRows.length; i++) {
                 const preview = allRows[i][0] || `ردیف خالی ${i + 1}`;
-                if (preview && preview.toString().trim()) { rowSelector.innerHTML += `<option value="${i}">${preview}</option>`; }
+                if (preview && preview.toString().trim()) { rowSelector.innerHTML += `<option value="<span class="math-inline">\{i\}"\></span>{preview}</option>`; }
             }
             rowSelector.parentElement.classList.remove('hidden');
             getSuggestionsBtn.disabled = true;
@@ -189,93 +247,3 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task: 'get_title_suggestions', brief: briefData })
                 });
-                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
-                
-                const data = await response.json();
-                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
-                sourceTitles = data.source_titles; 
-                aiSuggestedTitle = data.ai_suggested_title;
-
-                let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p><hr style="border-color: var(--border-color);"><p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul><hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
-                resultsArea.innerHTML = resultsHTML;
-                resultsArea.classList.remove('hidden');
-                choiceArea.classList.remove('hidden');
-                customTitleInput.value = aiSuggestedTitle; 
-            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
-            finally { loader.style.display = 'none'; getSuggestionsBtn.disabled = false; }
-        }
-
-        async function generateOutline() {
-            finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
-            if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
-
-            statusDiv.textContent = `عنوان نهایی تایید شد. در حال ارسال درخواست برای تولید سرفصل...`;
-            loader.style.display = 'block';
-
-            try {
-                const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        task: 'generate_outline',
-                        brief: briefData,
-                        top_titles: sourceTitles,
-                        final_title: finalApprovedTitle
-                    })
-                });
-                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
-
-                const data = await response.json();
-                generatedOutline = data.generated_outline;
-                
-                resultsArea.innerHTML += `<hr style="border-color: var(--border-color);"><h3>سرفصل‌های پیشنهادی:</h3><pre>${generatedOutline}</pre>`;
-                statusDiv.textContent = "سرفصل‌ها با موفقیت تولید شد.";
-                choiceArea.classList.add('hidden'); 
-                finalActionArea.classList.remove('hidden');
-            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
-            finally { loader.style.display = 'none'; }
-        }
-
-        async function generateFullArticle() {
-            statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد. این فرآیند طولانی‌ترین مرحله است، لطفاً صبور باشید...';
-            loader.style.display = 'block';
-            generateArticleBtn.disabled = true;
-
-            try {
-                const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        task: 'generate_article',
-                        brief: briefData,
-                        final_title: finalApprovedTitle,
-                        outline: generatedOutline
-                    })
-                });
-                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
-
-                const data = await response.json();
-                statusDiv.textContent = 'مقاله کامل با موفقیت تولید شد! در حال آماده‌سازی فایل Word...';
-
-                let htmlContent = `<h1>${finalApprovedTitle}</h1>\n${data.generated_article.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}`;
-                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Article</title></head><body><div dir='rtl'>";
-                const footer = "</div></body></html>";
-                const source = header + `<p>${htmlContent}</p>` + footer;
-                const fileBlob = new Blob([source], { type: 'application/msword' });
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(fileBlob);
-                link.download = `${finalApprovedTitle.replace(/ /g, '_')}.doc`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد. پروژه به اتمام رسید!";
-                finalActionArea.classList.add('hidden');
-
-            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; }
-            finally { loader.style.display = 'none'; generateArticleBtn.disabled = false; }
-        }
-    </script>
-</body>
-</html>
