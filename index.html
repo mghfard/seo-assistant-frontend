@@ -12,7 +12,7 @@
         :root {
             --background-dark: #1e1e32; --surface-dark: #2a2a4e; --primary-purple: #8e44ad;
             --primary-purple-light: #9b59b6; --text-light: #f0f0f0; --text-secondary: #a0a0c0;
-            --border-color: #4a4a6a; --shadow-color: rgba(0, 0, 0, 0.3);
+            --border-color: #4a4a6a; --shadow-color: rgba(0, 0, 0, 0.4);
         }
         * { box-sizing: border-box; }
         html { height: 100%; }
@@ -31,7 +31,7 @@
         .upload-area p { margin: 0; } 
         input[type="file"] { display: none; } 
         .hidden { display: none; }
-        #status, #login-status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); }
+        #status, #login-status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); min-height: 50px;}
         #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: #20203a; border-radius: 8px; text-align: right; line-height: 1.7; border: 1px solid var(--border-color); }
         #results-area ul { padding-right: 20px; } 
         #results-area strong { color: var(--primary-purple-light); }
@@ -89,7 +89,6 @@
 
     <script>
         // --- تعریف متغیرهای UI ---
-        //--کامنت---
         const loginContainer = document.getElementById('login-container');
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -124,7 +123,6 @@
             loginStatus.textContent = '';
             loginLoader.classList.remove('hidden');
             loginButton.disabled = true;
-
             try {
                 const response = await fetch(WORKER_URL, {
                     method: 'POST',
@@ -143,7 +141,7 @@
             }
         });
 
-        // --- بقیه کدهای اپلیکیشن اصلی ---
+        // --- کدهای اپلیکیشن اصلی ---
         fileInput.addEventListener('change', handleFileSelect);
         sheetSelector.addEventListener('change', handleSheetSelect);
         rowSelector.addEventListener('change', () => { getSuggestionsBtn.disabled = !rowSelector.value; });
@@ -238,7 +236,7 @@
         }
 
         async function generateFullArticle() {
-            statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد. این فرآیند طولانی‌ترین مرحله است، لطفاً صبور باشید...';
+            statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
             generateArticleBtn.disabled = true;
             try {
