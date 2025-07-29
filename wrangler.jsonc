@@ -1,5 +1,8 @@
 {
   "name": "seo-assistant-worker",
   "main": "src/index.ts",
-  "compatibility_date": "2025-06-11"
+  "compatibility_date": "2025-06-11",
+  "kv_namespaces": [
+    { "binding": "USERS", "id": "1ba015c1016b4e9f8da7c0feec72f900" }
+  ]
 }

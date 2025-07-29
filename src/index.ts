@@ -1,3 +1,18 @@
+// یک تابع کمکی ساده برای پاک‌سازی HTML و تبدیل آن به متن خام
+function stripHtml(html: string): string {
+    let clean = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '');
+    clean = clean.replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, '');
+    clean = clean.replace(/<\/div>/ig, '\n');
+    clean = clean.replace(/<\/li>/ig, '\n');
+    clean = clean.replace(/<li>/ig, '  * ');
+    clean = clean.replace(/<\/ul>/ig, '\n');
+    clean = clean.replace(/<\/p>/ig, '\n');
+    clean = clean.replace(/<br\s*[\/]?>/gi, '\n');
+    clean = clean.replace(/<[^>]+>/ig, '');
+    clean = clean.replace(/(\r\n|\n|\r){2,}/gm, '\n').trim();
+    return clean;
+}
+
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         
@@ -16,12 +31,10 @@ export default {
                 const body: { task?: string; brief?: any; top_titles?: string[]; final_title?: string; outline?: string; } = await request.json();
                 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
 
-                // تابع کمکی برای پیدا کردن هوشمندانه داده‌ها از بریف
                 const findInBrief = (keys: string[]) => {
                     if (!body.brief || !body.brief.headers || !body.brief.rowData) return null;
                     for (let i = 0; i < body.brief.headers.length; i++) {
                         const header = body.brief.headers[i];
-                        // --- این بخش امن‌سازی شده است ---
                         if (header && typeof header === 'string') {
                             const lowerHeader = header.toLowerCase();
                             for (const key of keys) {
@@ -34,7 +47,6 @@ export default {
                     return null;
                 };
 
-                // تابع کمکی برای ساخت بریف ساختاریافته
                 const getStructuredBrief = () => {
                     if (!body.brief || !body.brief.headers || !body.brief.rowData) return "";
                     let structuredBrief = "";
@@ -42,7 +54,7 @@ export default {
                         structuredBrief += `- ${body.brief.headers[i] || 'ستون خالی'}: ${body.brief.rowData[i] || 'داده خالی'}\n`;
                     }
                     return structuredBrief;
-                }
+                };
 
                 if (body.task === 'get_title_suggestions') {
                     const topic = findInBrief(['topic', 'عنوان', 'موضوع']);
@@ -81,17 +93,85 @@ export default {
                     const generatedOutline = geminiData.candidates[0].content.parts[0].text;
                     return new Response(JSON.stringify({ generated_outline: generatedOutline }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
                 }
+                // --- این بخش به طور کامل با منطق جدید و قوانین شما بازنویسی شده است ---
                 else if (body.task === 'generate_article') {
                     const { final_title, outline } = body;
                     if (!final_title || !outline) throw new Error("اطلاعات لازم برای تولید مقاله کامل ناقص است.");
 
                     const structuredBrief = getStructuredBrief();
                     const word_count = findInBrief(['word', 'count', 'کلمات', 'تعداد']) || 1500;
+                    let sourceUrl: string | null = null;
+                    if (body.brief && body.brief.rowData) {
+                        for (const data of body.brief.rowData) {
+                            if (data && typeof data === 'string' && (data.startsWith('http://') || data.startsWith('https://'))) {
+                                sourceUrl = data;
+                                break;
+                            }
+                        }
+                    }
 
-                    const articlePrompt = `You are a professional SEO content writer. Write a complete, comprehensive, and engaging blog post in PERSIAN. ALL INFORMATION: 1. Final Title: "${final_title}" 2. Brief: ${structuredBrief} 3. Outline to follow: ${outline}. CRITICAL INSTRUCTIONS: - YOU MUST WRITE AN ARTICLE OF AT LEAST ${word_count} WORDS. - Follow the outline precisely. - Write in fluent Persian. - Return ONLY the full text of the article.`;
+                    let articlePrompt = '';
+                    
+                    if (sourceUrl) {
+                        // **حالت آپدیت محتوا**
+                        console.log(`Source URL found: ${sourceUrl}. Fetching content...`);
+                        const response = await fetch(sourceUrl);
+                        if (!response.ok) throw new Error(`دسترسی به URL برای آپدیت ممکن نبود: ${sourceUrl}`);
+                        const htmlContent = await response.text();
+                        const oldArticleText = stripHtml(htmlContent);
 
-                    const geminiResponse = await fetch(GEMINI_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: articlePrompt }] }] }) });
-                     if (!geminiResponse.ok) throw new Error(`خطا در ارتباط با Gemini API برای تولید مقاله`);
+                        articlePrompt = `
+                            You are an expert SEO content rewriter. Your task is to update and refresh an existing article in PERSIAN.
+                            
+                            CONTEXT:
+                            1. Final Approved Title: "${final_title}"
+                            2. Content Brief: \n${structuredBrief}
+                            3. New Outline to Follow: \n${outline}
+                            4. IMPORTANT: The text of the OLD article is below:
+                               ---
+                               ${oldArticleText.substring(0, 8000)}
+                               ---
+
+                            CRITICAL INSTRUCTIONS:
+                            - Write a NEW and IMPROVED version of the article, avoiding duplicate content from the old text.
+                            - **The Introduction MUST be between 100-150 words.**
+                            - **After each H2 heading, you MUST write an introductory paragraph (50-100 words) about that topic before starting its H3 subheadings.** This is a mandatory rule.
+                            - **The final article MUST BE AT LEAST ${word_count} words.**
+                            - You MUST follow the new outline precisely.
+                            - Write in fluent, engaging Persian.
+                            - Return ONLY the full text of the article in Markdown.
+                        `;
+                    } else {
+                        // **حالت تولید محتوای جدید**
+                        console.log("No source URL found. Generating new content...");
+                        articlePrompt = `
+                            You are a professional SEO content writer. Your task is to write a complete, comprehensive, and engaging blog post in PERSIAN.
+                            
+                            ALL INFORMATION PROVIDED:
+                            1. Final Approved Title: "${final_title}"
+                            2. Content Brief: \n${structuredBrief}
+                            3. The exact Outline to follow: \n${outline}
+
+                            CRITICAL INSTRUCTIONS:
+                            - **The Introduction MUST be between 100-150 words.**
+                            - **After each H2 heading, you MUST write an introductory paragraph (50-100 words) about that topic before starting its H3 subheadings.** This is a mandatory rule.
+                            - **YOU MUST WRITE AN ARTICLE OF AT LEAST ${word_count} WORDS.**
+                            - You MUST follow the provided outline precisely.
+                            - Write in fluent, natural, and engaging Persian with short paragraphs.
+                            - Return ONLY the full text of the article in Markdown format.
+                        `;
+                    }
+
+                    const geminiResponse = await fetch(GEMINI_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: articlePrompt }] }] })
+                    });
+                     if (!geminiResponse.ok) {
+                        const errorText = await geminiResponse.text();
+                        throw new Error(`خطا در ارتباط با Gemini API برای تولید مقاله: ${errorText}`);
+                     }
+
                     const geminiData: any = await geminiResponse.json();
                     const generatedArticle = geminiData.candidates[0].content.parts[0].text;
                     return new Response(JSON.stringify({ generated_article: generatedArticle }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
