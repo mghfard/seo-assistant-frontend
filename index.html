@@ -88,7 +88,7 @@
     </div>
 
     <script>
-        // --- تعریف متغیرهای UI ---
+        // --- تعریف تمام متغیرهای UI در ابتدای اسکریپت
         const loginContainer = document.getElementById('login-container');
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -123,6 +123,7 @@
             loginStatus.textContent = '';
             loginLoader.classList.remove('hidden');
             loginButton.disabled = true;
+
             try {
                 const response = await fetch(WORKER_URL, {
                     method: 'POST',
