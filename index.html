@@ -68,6 +68,12 @@
             <hr style="border-color: var(--border-color); margin: 2rem 0;">
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
             <div id="row-selector-area" class="hidden"><label for="row-selector">۲. ردیف حاوی بریف را انتخاب کنید:</label><select id="row-selector"></select></div>
+            
+            <div style="text-align: right; margin-bottom: 1rem; font-size: 0.9em; display: flex; align-items: center; justify-content: flex-start;">
+                <input type="checkbox" id="use-google-search-checkbox" style="width: auto; margin-left: 8px;">
+                <label for="use-google-search-checkbox">استفاده از نتایج گوگل برای پیشنهاد عنوان</label>
+            </div>
+            
             <button id="get-suggestions-btn" disabled>دریافت پیشنهاد عنوان</button>
         </div>
         <div class="loader" id="loader"></div>
@@ -132,7 +138,9 @@
               refinementControls = document.getElementById('refinement-controls'),
               refinementPromptInput = document.getElementById('refinement-prompt-input'),
               regenerateOutlineBtn = document.getElementById('regenerate-outline-btn'),
-              approveOutlineBtn = document.getElementById('approve-outline-btn');
+              approveOutlineBtn = document.getElementById('approve-outline-btn'),
+              // متغیر جدید اضافه شده
+              useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
@@ -216,48 +224,65 @@
             getSuggestionsBtn.disabled = true;
         }
 
+        // --- تابع getTitleSuggestions به طور کامل بازنویسی شده است ---
         async function getTitleSuggestions() {
-            const selectedRowIndex = parseInt(rowSelector.value, 10);
-            if (isNaN(selectedRowIndex)) { statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.'; return; }
-            const rowData = allRows[selectedRowIndex];
-            briefData = { headers: headers, rowData: rowData };
-            statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
-            loader.style.display = 'block';
-            [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
-            getSuggestionsBtn.disabled = true;
-            try {
-                // --- وظیفه جدید: بررسی لاگین کاربر ---
-if (body.task === 'login') {
-    const { username, password } = body;
-    if (!username || !password) {
-        throw new Error("نام کاربری یا رمز عبور ارسال نشده است.");
+    const selectedRowIndex = parseInt(rowSelector.value, 10);
+    if (isNaN(selectedRowIndex)) { 
+        statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.';
+        return;
     }
     
-    const storedPassword = await env.USERS.get(username);
-    if (storedPassword === null) {
-        throw new Error("کاربری با این نام یافت نشد.");
-    }
+    const rowData = allRows[selectedRowIndex];
+    briefData = { headers: headers, rowData: rowData };
+    
+    const useGoogleSearch = useGoogleSearchCheckbox.checked;
 
-    if (storedPassword === password) {
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-    } else {
-        throw new Error("رمز عبور اشتباه است.");
+    statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
+    loader.style.display = 'block';
+    [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
+    getSuggestionsBtn.disabled = true;
+
+    try {
+        const response = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                task: 'get_title_suggestions', 
+                brief: briefData,
+                use_google_search: useGoogleSearch 
+            })
+        });
+
+        if (!response.ok) { 
+            const d = await response.json(); 
+            throw new Error(d.error);
+        }
+
+        const data = await response.json();
+        statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
+        sourceTitles = data.source_titles || []; 
+        aiSuggestedTitle = data.ai_suggested_title;
+        
+        let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p>`;
+        
+        if (sourceTitles.length > 0) {
+            resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul>`;
+        }
+        
+        resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
+        
+        resultsArea.innerHTML = resultsHTML;
+        resultsArea.classList.remove('hidden');
+        choiceArea.classList.remove('hidden');
+        customTitleInput.value = aiSuggestedTitle;
+
+    } catch (error) {
+        statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
+    } finally {
+        loader.style.display = 'none';
+        getSuggestionsBtn.disabled = false;
     }
 }
-                const response = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'get_title_suggestions', brief: briefData }) });
-                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
-                const data = await response.json();
-                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
-                sourceTitles = data.source_titles; 
-                aiSuggestedTitle = data.ai_suggested_title;
-                let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p><hr style="border-color: var(--border-color);"><p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul><hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
-                resultsArea.innerHTML = resultsHTML;
-                resultsArea.classList.remove('hidden');
-                choiceArea.classList.remove('hidden');
-                customTitleInput.value = aiSuggestedTitle; 
-            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
-            finally { loader.style.display = 'none'; getSuggestionsBtn.disabled = false; }
-        }
 
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;

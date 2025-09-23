@@ -54,7 +54,6 @@ export default {
                 const body: any = await request.json();
                 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
                 
-                // --- وظیفه جدید: بررسی لاگین کاربر ---
                 if (body.task === 'login') {
                     const { username, password } = body;
                     if (!username || !password) {
@@ -75,41 +74,58 @@ export default {
                     }
                 }
 
+                // --- وظیفه get_title_suggestions به طور کامل بازنویسی شده است ---
                 if (body.task === 'get_title_suggestions') {
-                    const topic = findInBrief(body.brief, ['topic', 'عنوان', 'موضوع']);
+                    const { brief, use_google_search } = body;
+                    
+                    const topic = findInBrief(brief, ['topic', 'عنوان', 'موضوع']);
                     if (!topic) throw new Error("ستون موضوع اصلی یافت نشد.");
-                    
-                    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${env.GOOGLE_API_KEY}&cx=${env.GOOGLE_CSE_ID}&q=${encodeURIComponent(topic)}&num=5&gl=ir&hl=fa`;
-                    const searchResponse = await fetch(searchUrl);
-                    if (!searchResponse.ok) throw new Error(`خطا در Google Search API`);
-                    
-                    const searchData: any = await searchResponse.json();
-                    const topTitles = searchData.items?.map((item: any) => item.title) || [];
-                    if (topTitles.length === 0) throw new Error("هیچ عنوانی در گوگل یافت نشد.");
-                    
-                    const titlePrompt = `Based on topic "${topic}" and top 5 titles:\n${topTitles.join('\n')}\nSuggest one new SEO title.`;
-                    const geminiResponse = await fetch(GEMINI_API_URL, { 
-                        body: JSON.stringify({ contents: [{ parts: [{ text: titlePrompt }] }] }), 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        method: 'POST' 
-                    });
-                    
-                    if (!geminiResponse.ok) { 
-                        const errorText = await geminiResponse.text(); 
-                        throw new Error(`خطا در Gemini API: ${errorText}`);
+                
+                    let topTitles: string[] = []; 
+                
+                    if (use_google_search === true) {
+                        const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${env.GOOGLE_API_KEY}&cx=${env.GOOGLE_CSE_ID}&q=${encodeURIComponent(topic)}&num=5&gl=ir&hl=fa`;
+                        const searchResponse = await fetch(searchUrl);
+                        
+                        if (!searchResponse.ok) {
+                            console.error("Google Search API failed, proceeding without competitor titles.");
+                        } else {
+                            const searchData: any = await searchResponse.json();
+                            topTitles = searchData.items?.map((item: any) => item.title) || [];
+                        }
                     }
                     
+                    let titlePrompt: string;
+                
+                    if (topTitles.length > 0) {
+                        titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}" and the top 5 competitor titles from Google search:\n${topTitles.join('\n')}\n\nSuggest one new, superior, and SEO-friendly title in Persian that can outperform them. Return only the title text.`;
+                    } else {
+                        titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}", suggest one creative and SEO-friendly title in Persian. Return only the title text.`;
+                    }
+                
+                    const geminiResponse = await fetch(GEMINI_API_URL, {
+                        body: JSON.stringify({ contents: [{ parts: [{ text: titlePrompt }] }] }),
+                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST'
+                    });
+                
+                    if (!geminiResponse.ok) {
+                        const errorText = await geminiResponse.text();
+                        throw new Error(`خطا در Gemini API: ${errorText}`);
+                    }
+                
                     const geminiData: any = await geminiResponse.json();
                     const aiSuggestedTitle = geminiData.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
-                    
-                    return new Response(JSON.stringify({ 
-                        original_topic: topic, 
-                        source_titles: topTitles, 
-                        ai_suggested_title: aiSuggestedTitle.trim() 
-                    }), { 
+                
+                    return new Response(JSON.stringify({
+                        original_topic: topic,
+                        source_titles: topTitles,
+                        ai_suggested_title: aiSuggestedTitle.trim()
+                    }), {
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
+                
                 else if (body.task === 'generate_outline') {
                     const { final_title, top_titles, brief } = body;
                     if (!final_title || !top_titles || !brief) throw new Error("اطلاعات برای تولید سرفصل ناقص است.");
@@ -144,6 +160,7 @@ INSTRUCTIONS:
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
+                
                 else if (body.task === 'refine_outline') {
                     const { final_title, outline, refinement_prompt, brief } = body;
                     if (!final_title || !outline || !refinement_prompt || !brief) throw new Error("اطلاعات لازم برای اصلاح سرفصل ناقص است.");
@@ -190,6 +207,7 @@ YOUR TASK:
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
+                
                 else if (body.task === 'generate_article') {
                     const { final_title, outline, brief } = body;
                     if (!final_title || !outline || !brief) throw new Error("اطلاعات برای تولید مقاله ناقص است.");
@@ -202,6 +220,8 @@ YOUR TASK:
                     
                     let articlePrompt = '';
 
+                    // نکته: منطق تولید مقاله شما فقط برای حالتی که URL وجود دارد نوشته شده.
+                    // برای حالت بدون URL باید یک پرامپت دیگر در بلوک else تعریف کنید.
                     if (sourceUrl && sourceUrl.startsWith('http')) {
                         const response = await fetch(sourceUrl);
                         if (!response.ok) throw new Error(`دسترسی به URL برای آپدیت ممکن نبود: ${sourceUrl}`);
