@@ -66,6 +66,15 @@
         <input type="file" id="excel-file" accept=".xlsx, .xls">
         <div id="interaction-area" class="hidden">
             <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+            <div id="model-selector-area">
+                <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
+                <select id="model-selector">
+                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (سریع و اقتصادی)</option>
+                    <option value="groq-llama3-8b">Groq Llama 3 8B (بسیار سریع)</option>
+                </select>
+            </div>
+
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
             <div id="row-selector-area" class="hidden"><label for="row-selector">۲. ردیف حاوی بریف را انتخاب کنید:</label><select id="row-selector"></select></div>
             
@@ -139,8 +148,9 @@
               refinementPromptInput = document.getElementById('refinement-prompt-input'),
               regenerateOutlineBtn = document.getElementById('regenerate-outline-btn'),
               approveOutlineBtn = document.getElementById('approve-outline-btn'),
-              // متغیر جدید اضافه شده
-              useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox');
+              useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox'),
+              // متغیر جدید: انتخاب‌گر مدل
+              modelSelector = document.getElementById('model-selector');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
@@ -161,7 +171,7 @@
 
         // --- توابع اجرایی ---
 
-        async function handleLogin(e) {
+        async function handleLogin(e) { /* بدون تغییر */
             e.preventDefault();
             loginStatus.textContent = '';
             loginLoader.classList.remove('hidden');
@@ -184,7 +194,7 @@
             }
         }
         
-        async function handleFileSelect(event) {
+        async function handleFileSelect(event) { /* بدون تغییر */
             const file = event.target.files[0];
             if (!file) return;
             fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
@@ -203,7 +213,7 @@
             finally { loader.style.display = 'none'; }
         }
 
-        function handleSheetSelect() {
+        function handleSheetSelect() { /* بدون تغییر */
             const selectedSheetName = sheetSelector.value;
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
             if (!selectedSheetName) {
@@ -223,76 +233,65 @@
             rowSelector.parentElement.classList.remove('hidden');
             getSuggestionsBtn.disabled = true;
         }
-
-        // --- تابع getTitleSuggestions به طور کامل بازنویسی شده است ---
+        
         async function getTitleSuggestions() {
-    const selectedRowIndex = parseInt(rowSelector.value, 10);
-    if (isNaN(selectedRowIndex)) { 
-        statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.';
-        return;
-    }
-    
-    const rowData = allRows[selectedRowIndex];
-    briefData = { headers: headers, rowData: rowData };
-    
-    const useGoogleSearch = useGoogleSearchCheckbox.checked;
-
-    statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
-    loader.style.display = 'block';
-    [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
-    getSuggestionsBtn.disabled = true;
-
-    try {
-        const response = await fetch(WORKER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                task: 'get_title_suggestions', 
-                brief: briefData,
-                use_google_search: useGoogleSearch 
-            })
-        });
-
-        if (!response.ok) { 
-            const d = await response.json(); 
-            throw new Error(d.error);
+            const selectedRowIndex = parseInt(rowSelector.value, 10);
+            if (isNaN(selectedRowIndex)) { statusDiv.textContent = 'لطفاً یک ردیف معتبر انتخاب کنید.'; return; }
+            const rowData = allRows[selectedRowIndex];
+            briefData = { headers: headers, rowData: rowData };
+            const useGoogleSearch = useGoogleSearchCheckbox.checked;
+            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
+            loader.style.display = 'block';
+            [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
+            getSuggestionsBtn.disabled = true;
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        task: 'get_title_suggestions', 
+                        brief: briefData,
+                        use_google_search: useGoogleSearch,
+                        model: selectedModel // ارسال مدل انتخاب شده
+                    })
+                });
+                if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
+                const data = await response.json();
+                statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد.';
+                sourceTitles = data.source_titles || []; 
+                aiSuggestedTitle = data.ai_suggested_title;
+                let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p>`;
+                if (sourceTitles.length > 0) {
+                    resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>عناوین برتر در گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul>`;
+                }
+                resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
+                resultsArea.innerHTML = resultsHTML;
+                resultsArea.classList.remove('hidden');
+                choiceArea.classList.remove('hidden');
+                customTitleInput.value = aiSuggestedTitle;
+            } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
+            finally { loader.style.display = 'none'; getSuggestionsBtn.disabled = false; }
         }
-
-        const data = await response.json();
-        statusDiv.textContent = 'پیشنهادها با موفقیت دریافت شد. لطفاً عنوان نهایی را انتخاب کنید.';
-        sourceTitles = data.source_titles || []; 
-        aiSuggestedTitle = data.ai_suggested_title;
-        
-        let resultsHTML = `<p><strong>موضوع اصلی شما:</strong> ${data.original_topic}</p>`;
-        
-        if (sourceTitles.length > 0) {
-            resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>۵ عنوان برتر در نتایج گوگل:</strong></p><ul>${sourceTitles.map(title => `<li>${title}</li>`).join('')}</ul>`;
-        }
-        
-        resultsHTML += `<hr style="border-color: var(--border-color);"><p><strong>⭐ عنوان پیشنهادی هوش مصنوعی:</strong></p><p>${aiSuggestedTitle}</p>`;
-        
-        resultsArea.innerHTML = resultsHTML;
-        resultsArea.classList.remove('hidden');
-        choiceArea.classList.remove('hidden');
-        customTitleInput.value = aiSuggestedTitle;
-
-    } catch (error) {
-        statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`;
-    } finally {
-        loader.style.display = 'none';
-        getSuggestionsBtn.disabled = false;
-    }
-}
 
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
             if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
-            statusDiv.textContent = `عنوان نهایی تایید شد. در حال ارسال درخواست برای تولید سرفصل...`;
+            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            statusDiv.textContent = `در حال ارسال درخواست برای تولید سرفصل...`;
             loader.style.display = 'block';
             choiceArea.classList.add('hidden');
             outlineSubmitBtn.disabled = true;
             try {
-                const response = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'generate_outline', brief: briefData, top_titles: sourceTitles, final_title: finalApprovedTitle }) });
+                const response = await fetch(WORKER_URL, { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        task: 'generate_outline', 
+                        brief: briefData, 
+                        top_titles: sourceTitles, 
+                        final_title: finalApprovedTitle,
+                        model: selectedModel // ارسال مدل انتخاب شده
+                    }) 
+                });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
                 const data = await response.json();
                 currentOutline = data.generated_outline;
@@ -307,41 +306,54 @@
         async function refineOutline() {
             const refinement_prompt = refinementPromptInput.value;
             if (!refinement_prompt) { alert('لطفاً دستورالعمل اصلاحی خود را وارد کنید.'); return; }
+            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
             statusDiv.textContent = `در حال ارسال درخواست برای اصلاح سرفصل...`;
             loader.style.display = 'block';
             try {
                 const response = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task: 'refine_outline', brief: briefData, final_title: finalApprovedTitle, outline: currentOutline, refinement_prompt: refinement_prompt })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        task: 'refine_outline', 
+                        brief: briefData, 
+                        final_title: finalApprovedTitle, 
+                        outline: currentOutline, 
+                        refinement_prompt: refinement_prompt,
+                        model: selectedModel // ارسال مدل انتخاب شده
+                    })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
                 const data = await response.json();
                 currentOutline = data.generated_outline;
-                const outlinePre = document.getElementById('outline-pre');
-                if(outlinePre) {
-                  outlinePre.textContent = currentOutline;
-                }
-                statusDiv.textContent = "سرفصل‌ها با موفقیت اصلاح شد. لطفاً دوباره بازبینی کنید.";
+                document.getElementById('outline-pre').textContent = currentOutline;
+                statusDiv.textContent = "سرفصل‌ها با موفقیت اصلاح شد.";
                 refinementPromptInput.value = '';
                 refinementControls.classList.add('hidden');
-                
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
             finally { loader.style.display = 'none'; }
         }
 
-        function approveOutline() {
+        function approveOutline() { /* بدون تغییر */
             statusDiv.textContent = `سرفصل‌ها تایید شد. آماده برای تولید مقاله کامل.`;
             refinementArea.classList.add('hidden');
             finalActionArea.classList.remove('hidden');
         }
 
         async function generateFullArticle() {
+            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
             statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
             generateArticleBtn.disabled = true;
             try {
-                const response = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'generate_article', brief: briefData, final_title: finalApprovedTitle, outline: currentOutline }) });
+                const response = await fetch(WORKER_URL, { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        task: 'generate_article', 
+                        brief: briefData, 
+                        final_title: finalApprovedTitle, 
+                        outline: currentOutline,
+                        model: selectedModel // ارسال مدل انتخاب شده
+                    }) 
+                });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
                 const data = await response.json();
                 statusDiv.textContent = 'مقاله کامل با موفقیت تولید شد! در حال آماده‌سازی فایل Word...';
@@ -356,7 +368,7 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد. پروژه به اتمام رسید!";
+                statusDiv.innerHTML += "<br>فایل Word با موفقیت برای دانلود آماده شد.";
                 finalActionArea.classList.add('hidden');
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; }
             finally { loader.style.display = 'none'; generateArticleBtn.disabled = false; }
