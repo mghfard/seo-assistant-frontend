@@ -226,6 +226,24 @@
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
             getSuggestionsBtn.disabled = true;
             try {
+                // --- وظیفه جدید: بررسی لاگین کاربر ---
+if (body.task === 'login') {
+    const { username, password } = body;
+    if (!username || !password) {
+        throw new Error("نام کاربری یا رمز عبور ارسال نشده است.");
+    }
+    
+    const storedPassword = await env.USERS.get(username);
+    if (storedPassword === null) {
+        throw new Error("کاربری با این نام یافت نشد.");
+    }
+
+    if (storedPassword === password) {
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    } else {
+        throw new Error("رمز عبور اشتباه است.");
+    }
+}
                 const response = await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'get_title_suggestions', brief: briefData }) });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
                 const data = await response.json();
