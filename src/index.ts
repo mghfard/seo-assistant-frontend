@@ -36,6 +36,54 @@ function getStructuredBrief(brief: any): string {
     return structuredBrief;
 }
 
+async function generateContent(prompt: string, model: string, env: Env): Promise<string> {
+    const selectedModel = model || 'gemini-1.5-flash';
+
+    switch (selectedModel) {
+        case 'gemini-1.5-flash': {
+            const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
+            const response = await fetch(GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Gemini API Error: ${errorText}`);
+            }
+            const data: any = await response.json();
+            return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
+        }
+            
+        // این case دقیقاً با مقدار value در HTML جدید مطابقت دارد
+        case 'groq-gpt-oss-20b': { 
+            const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+            const response = await fetch(GROQ_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messages: [{ role: 'user', content: prompt }],
+                    // شناسه مدل به صورت ثابت روی نسخه‌ای که کار می‌کرد تنظیم شده است
+                    model: 'openai/gpt-oss-20b', 
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Groq API Error: ${errorText}`);
+            }
+            const data: any = await response.json();
+            return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
+        }
+
+        default:
+            // این خطا زمانی نمایش داده می‌شود که هماهنگی وجود نداشته باشد
+            throw new Error(`مدل انتخاب شده نامعتبر است: ${selectedModel}`);
+    }
+}
+
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         
@@ -52,19 +100,17 @@ export default {
         if (request.method === 'POST') {
             try {
                 const body: any = await request.json();
-                const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
                 
                 if (body.task === 'login') {
+                    // ... (بخش لاگین بدون تغییر)
                     const { username, password } = body;
                     if (!username || !password) {
                         throw new Error("نام کاربری یا رمز عبور ارسال نشده است.");
                     }
-                    
                     const storedPassword = await env.USERS.get(username);
                     if (storedPassword === null) {
                         throw new Error("کاربری با این نام یافت نشد.");
                     }
-
                     if (storedPassword === password) {
                         return new Response(JSON.stringify({ success: true }), { 
                             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -74,49 +120,28 @@ export default {
                     }
                 }
 
-                // --- وظیفه get_title_suggestions به طور کامل بازنویسی شده است ---
                 if (body.task === 'get_title_suggestions') {
-                    const { brief, use_google_search } = body;
-                    
+                    // ... (این بخش بدون تغییر)
+                    const { brief, use_google_search, model } = body;
                     const topic = findInBrief(brief, ['topic', 'عنوان', 'موضوع']);
                     if (!topic) throw new Error("ستون موضوع اصلی یافت نشد.");
-                
-                    let topTitles: string[] = []; 
-                
+                    let topTitles: string[] = [];
                     if (use_google_search === true) {
                         const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${env.GOOGLE_API_KEY}&cx=${env.GOOGLE_CSE_ID}&q=${encodeURIComponent(topic)}&num=5&gl=ir&hl=fa`;
                         const searchResponse = await fetch(searchUrl);
-                        
-                        if (!searchResponse.ok) {
-                            console.error("Google Search API failed, proceeding without competitor titles.");
-                        } else {
+                        if (searchResponse.ok) {
                             const searchData: any = await searchResponse.json();
                             topTitles = searchData.items?.map((item: any) => item.title) || [];
+                        } else {
+                             console.error("Google Search API failed, proceeding without competitor titles.");
                         }
                     }
+                    let titlePrompt = topTitles.length > 0
+                        ? `You are an expert SEO copywriter. Based on the main topic "${topic}" and the top 5 competitor titles from Google search:\n${topTitles.join('\n')}\n\nSuggest one new, superior, and SEO-friendly title in Persian that can outperform them. Return only the title text.`
+                        : `You are an expert SEO copywriter. Based on the main topic "${topic}", suggest one creative and SEO-friendly title in Persian. Return only the title text.`;
                     
-                    let titlePrompt: string;
-                
-                    if (topTitles.length > 0) {
-                        titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}" and the top 5 competitor titles from Google search:\n${topTitles.join('\n')}\n\nSuggest one new, superior, and SEO-friendly title in Persian that can outperform them. Return only the title text.`;
-                    } else {
-                        titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}", suggest one creative and SEO-friendly title in Persian. Return only the title text.`;
-                    }
-                
-                    const geminiResponse = await fetch(GEMINI_API_URL, {
-                        body: JSON.stringify({ contents: [{ parts: [{ text: titlePrompt }] }] }),
-                        headers: { 'Content-Type': 'application/json' },
-                        method: 'POST'
-                    });
-                
-                    if (!geminiResponse.ok) {
-                        const errorText = await geminiResponse.text();
-                        throw new Error(`خطا در Gemini API: ${errorText}`);
-                    }
-                
-                    const geminiData: any = await geminiResponse.json();
-                    const aiSuggestedTitle = geminiData.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
-                
+                    const aiSuggestedTitle = await generateContent(titlePrompt, model, env);
+
                     return new Response(JSON.stringify({
                         original_topic: topic,
                         source_titles: topTitles,
@@ -127,63 +152,46 @@ export default {
                 }
                 
                 else if (body.task === 'generate_outline') {
-                    const { final_title, top_titles, brief } = body;
-                    if (!final_title || !top_titles || !brief) throw new Error("اطلاعات برای تولید سرفصل ناقص است.");
-                    
+                    // ... (این بخش بدون تغییر)
+                    const { final_title, top_titles, brief, model } = body;
+                    if (!final_title || !brief) throw new Error("اطلاعات برای تولید سرفصل ناقص است.");
                     const structuredBrief = getStructuredBrief(brief);
-                    const word_count = findInBrief(brief, ['word', 'count', 'کلمات', 'تعداد']) || 1500;
-                    
+                    const word_count = findInBrief(brief, ['word', 'count', 'کلمات', 'تعداد']) || '1500'; // دریافت به عنوان رشته
                     const outlinePrompt = `You are an SEO expert. Create a detailed outline in Persian for a blog post. 
 CONTEXT: 
 - Title: "${final_title}" 
 - Brief: \n${structuredBrief} 
-- Competitors: \n${top_titles.join('\n')}
+- Competitors: \n${(top_titles || []).join('\n')}
 
 INSTRUCTIONS: 
 - Use Persian Markdown (##, ###)
 - Create optimal structure: 3-5 H2 sections with 2-3 H3 subheadings each
 - The outline must support an article of ~${word_count} words
 - Return ONLY the Markdown outline`;
-
-                    const geminiResponse = await fetch(GEMINI_API_URL, { 
-                        body: JSON.stringify({ contents: [{ parts: [{ text: outlinePrompt }] }] }), 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        method: 'POST' 
-                    });
-                    
-                    if (!geminiResponse.ok) throw new Error(`خطا در Gemini API برای تولید سرفصل`);
-                    
-                    const geminiData: any = await geminiResponse.json();
-                    const generatedOutline = geminiData.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی برای سرفصل از Gemini دریافت نشد.";
-                    
+                    const generatedOutline = await generateContent(outlinePrompt, model, env);
                     return new Response(JSON.stringify({ generated_outline: generatedOutline }), { 
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
                 
                 else if (body.task === 'refine_outline') {
-                    const { final_title, outline, refinement_prompt, brief } = body;
+                    // ... (این بخش بدون تغییر)
+                    const { final_title, outline, refinement_prompt, brief, model } = body;
                     if (!final_title || !outline || !refinement_prompt || !brief) throw new Error("اطلاعات لازم برای اصلاح سرفصل ناقص است.");
-
                     const structuredBrief = getStructuredBrief(brief);
-
                     const refinePrompt = `
 You are an expert content editor. A first draft of a blog post outline has been generated. The user has provided feedback to refine it.
-
 CONTEXT:
 - Final Approved Title: "${final_title}"
 - Original Content Brief: \n${structuredBrief}
-
 THE ORIGINAL OUTLINE (Version 1):
 ---
 ${outline}
 ---
-
 USER'S INSTRUCTIONS FOR REFINEMENT:
 ---
 "${refinement_prompt}"
 ---
-
 YOUR TASK:
 - Read the original outline and the user's instructions carefully.
 - Generate a NEW AND IMPROVED outline that incorporates the user's feedback.
@@ -191,117 +199,119 @@ YOUR TASK:
 - Maintain optimal structure: 3-5 H2 sections with 2-3 H3 subheadings each
 - Return ONLY the new, complete Markdown outline. Do not add any other commentary.
 `;
-                    
-                    const geminiResponse = await fetch(GEMINI_API_URL, { 
-                        body: JSON.stringify({ contents: [{ parts: [{ text: refinePrompt }] }] }), 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        method: 'POST' 
-                    });
-                    
-                    if (!geminiResponse.ok) throw new Error(`خطا در ارتباط با Gemini API برای اصلاح سرفصل`);
-                    
-                    const geminiData: any = await geminiResponse.json();
-                    const refinedOutline = geminiData.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی برای اصلاح سرفصل از Gemini دریافت نشد.";
-                    
+                    const refinedOutline = await generateContent(refinePrompt, model, env);
                     return new Response(JSON.stringify({ generated_outline: refinedOutline }), { 
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
                 }
                 
                 else if (body.task === 'generate_article') {
-                    const { final_title, outline, brief } = body;
+                    const { final_title, outline, brief, model } = body;
                     if (!final_title || !outline || !brief) throw new Error("اطلاعات برای تولید مقاله ناقص است.");
                     
                     const structuredBrief = getStructuredBrief(brief);
-                    const word_count = findInBrief(brief, ['word', 'count', 'کلمات', 'تعداد']) || 1500;
+                    
+                    // --- اصلاحیه ۱: تبدیل word_count به عدد ---
+                    const word_count_str = findInBrief(brief, ['word', 'count', 'کلمات', 'تعداد']) || '1500';
+                    const word_count = parseInt(word_count_str, 10);
+                    
                     const brand_name = findInBrief(brief, ['brand', 'برند', 'نام برند']);
-                    const faq_count = findInBrief(brief, ['faq', 'سوالات متداول', 'تعداد سوالات']) || 3;
+                    
+                    // --- اصلاحیه ۲: تعریف مجدد متغیر faq_count ---
+                    const faq_count_str = findInBrief(brief, ['faq', 'سوالات متداول', 'تعداد سوالات']) || '3';
+                    const faq_count = parseInt(faq_count_str, 10);
+
                     const sourceUrl: string | null = findInBrief(brief, ['url']);
                     
                     let articlePrompt = '';
 
-                    // نکته: منطق تولید مقاله شما فقط برای حالتی که URL وجود دارد نوشته شده.
-                    // برای حالت بدون URL باید یک پرامپت دیگر در بلوک else تعریف کنید.
                     if (sourceUrl && sourceUrl.startsWith('http')) {
                         const response = await fetch(sourceUrl);
                         if (!response.ok) throw new Error(`دسترسی به URL برای آپدیت ممکن نبود: ${sourceUrl}`);
                         const htmlContent = await response.text();
                         const oldArticleText = stripHtml(htmlContent);
 
-                        articlePrompt = `
-Act as a professional SEO content writer. Your mission is to write a comprehensive Persian blog post that meets EXACT word count requirements.
-
+                        articlePrompt =`
+You are a professional SEO content writer. Your mission is to write a comprehensive Persian blog post following these PRIORITY-BASED directives:
 ---
-**1. CORE REQUIREMENTS**
-- **Primary Topic:** "${final_title}"
-- **Target Word Count:** ${word_count} words MINIMUM
-- **Content Brief:** \n${structuredBrief}
-
+**PRIORITY 1: WORD COUNT - NON-NEGOTIABLE**
+- **Primary Goal:** Article must be exactly ${word_count} words or MORE
+- **Word Count Guarantee System:**
+  1. First, calculate if you'll reach ${word_count} words
+  2. If not, immediately add more headings/content
+  3. Continuously monitor word count during writing
+  4. If falling short, expand existing sections
 ---
-**2. AUTOMATIC WORD COUNT MANAGEMENT SYSTEM**
-
-**PHASE 1: INITIAL ESTIMATION**
-- Analyze the outline and estimate total word count
-- If estimated words =< ${word_count}, proceed to PHASE 2
-
-**PHASE 2: DYNAMIC CONTENT EXPANSION**
-- **Option A:** Add 1 additional H2 section related to "${final_title}"
-- **Option B:** Add 1-2 more H3 subheadings to existing H2 sections  
-- **Option C:** Expand existing content with more details/examples
-- **Option D:** Increase depth of introduction/conclusion sections
-
-**PHASE 3: FINAL STRUCTURE OPTIMIZATION**
-- Ensure structure contains:
-  - ## مقدمه (150+ words)
-  - 2-4 main H2 sections (each with 2-4 H3 subheadings)
-  - ## نتیجه‌گیری (150+ words)
-  - ## سوالات متداول
-
+**PRIORITY 2: FIXED INTRODUCTION & CONCLUSION STRUCTURE**
+- ## مقدمه (150+ words) - MUST be first section
+- ## نتیجه‌گیری (150+ words) - MUST be second-to-last section  
+- ## سوالات متداول - MUST be last section
 ---
-**3. CONTENT GENERATION RULES**
-
-**A. Section Word Count Targets:**
-- **H2 Introductory Paragraph:** 200-250 words each
-- **H3 Subsections:** 100-150 words each
-- **Introduction/Conclusion:** 150+ words each
-
-**B. Content Quality Requirements:**
-- All content must directly address "${final_title}"
-- Provide deep, comprehensive coverage - avoid superficial treatment
-- Use examples, data, and practical applications to expand content
-
-**C. Brand Mention Protocol:**
-${brand_name ? `- Mention "${brand_name}" exactly 2 times maximum` : '- No brand mention required'}
-
+**PRIORITY 3: SMART HEADLINE SELECTION**
+- From the outline, select only 2-3 H2s most relevant to "${final_title}"
+- For each H2, select 2-3 H3 subheadings
+- Add more H2/H3 only if needed to reach word count target
 ---
-**4. EXECUTION PROTOCOL**
-
-**Step 1:** Create initial structure with 2 H2 sections
-**Step 2:** Estimate word count - if < ${word_count}, add more content
-**Step 3:** Continuously monitor word count during writing
-**Step 4:** If falling short, immediately add headings or expand content
-**Step 5:** Final article must reach ${word_count} words minimum
-
-**WORD COUNT GUARANTEE:** You are responsible for ensuring the final article meets the ${word_count} word target. Use dynamic expansion as needed.
-
-Generate the article now using this adaptive system.
+**EXECUTION PLAN:**
+**Step 1: Word Count Calculation**
+- Fixed sections: Introduction (150) + Conclusion (150) + FAQ (200) = 500 words
+- Remaining for main content: ${word_count - 500} words
+- Required H2 sections: Minimum ${Math.ceil((word_count - 500) / 400)} sections
+**Step 2: Content Production with Real-time Monitoring**
+- After each section, count words
+- If behind schedule, make next section more detailed
+**Step 3: Final Verification**
+- Count total words before finishing
+- If less than ${word_count}, add more content to existing sections
+---
+**CONTENT STRUCTURE:**
+## مقدمه
+[150+ words - directly address "${final_title}"]
+## [H2 1 - relevant to main topic]
+[200+ word introductory paragraph]
+### [H3 1]
+[150+ words]
+### [H3 2] 
+[150+ words]
+## [H2 2 - relevant to main topic]
+[200+ word introductory paragraph]
+### [H3 1]
+[150+ words]
+### [H3 2]
+[150+ words]
+${word_count > 1200 ? `## [H2 3 - added for word count]
+[200+ word introductory paragraph]
+### [H3 1]
+[150+ words]` : ''}
+## نتیجه‌گیری
+[150+ words - comprehensive summary]
+## سوالات متداول
+[${faq_count} questions with detailed answers]
+---
+**FINAL REQUIREMENT:**
+Your article MUST reach minimum ${word_count} words. This is the primary evaluation criteria.
+Generate the article now following these priority-based rules.
 `;
+                    } else {
+                        articlePrompt = `You are a professional SEO content writer. Write a comprehensive, high-quality, and engaging blog post in Persian.
+CONTEXT:
+- Title: "${final_title}"
+- Word Count: Approximately ${word_count} words
+- Detailed Brief: \n${structuredBrief}
+ARTICLE OUTLINE TO FOLLOW:
+---
+${outline}
+---
+INSTRUCTIONS:
+- Follow the outline strictly.
+- Write in a clear, informative, and engaging tone.
+- Ensure the final article meets the target word count.
+- Use Persian Markdown for headings (## for H2, ### for H3).
+- Start with an introduction and end with a conclusion.
+- Add a FAQ section with ${faq_count} relevant questions if appropriate.`;
                     }
 
-                    const geminiResponse = await fetch(GEMINI_API_URL, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify({ contents: [{ parts: [{ text: articlePrompt }] }] }) 
-                    });
-                    
-                    if (!geminiResponse.ok) { 
-                        const errorText = await geminiResponse.text(); 
-                        throw new Error(`خطا در Gemini API برای تولید مقاله: ${errorText}`); 
-                    }
-                    
-                    const geminiData: any = await geminiResponse.json();
-                    const generatedArticle = geminiData.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی برای مقاله از Gemini دریافت نشد.";
-                    
+                    const generatedArticle = await generateContent(articlePrompt, model, env);
                     return new Response(JSON.stringify({ generated_article: generatedArticle }), { 
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                     });
@@ -328,4 +338,5 @@ interface Env {
     GEMINI_API_KEY: string;
     GOOGLE_API_KEY: string;
     GOOGLE_CSE_ID: string;
+    GROQ_API_KEY: string; 
 }
