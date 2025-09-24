@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دستیار سئو Gemini</title>
+    <title>دستیار سئو</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,13 +26,13 @@
         select:focus, input[type="text"]:focus, input[type="password"]:focus, textarea:focus { border-color: var(--primary-purple); box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.3); outline: none; }
         button { background-image: linear-gradient(45deg, var(--primary-purple), var(--primary-purple-light)); color: white; border: none; cursor: pointer; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         button:disabled { background-image: none; background-color: #555; color: #999; cursor: not-allowed; box-shadow: none; }
-        button:hover:not(:disabled) { background-image: linear-gradient(45deg, var(--primary-purple-hover), var(--primary-purple)); box-shadow: 0 6px 20px rgba(0,0,0,0.3); transform: translateY(-2px); }
+        button:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(0,0,0,0.3); transform: translateY(-2px); }
         .upload-area { border: 2px dashed var(--primary-purple); padding: 1.5rem; min-height: 4rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; margin-top: 1.5rem; }
         .upload-area:hover { background-color: #3a3a5e; } 
         .upload-area p { margin: 0; } 
         input[type="file"] { display: none; } 
         .hidden { display: none; }
-        #status, #login-status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); min-height: 50px;}
+        #status, #login-status { margin-top: 1.5rem; padding: 1rem; background-color: var(--background-dark); border-radius: 8px; text-align: right; line-height: 1.8; border: 1px solid var(--border-color); min-height: 50px; white-space: pre-wrap; }
         #results-area { margin-top: 1.5rem; padding: 1.5rem; background-color: #20203a; border-radius: 8px; text-align: right; line-height: 1.7; border: 1px solid var(--border-color); }
         #results-area ul { padding-right: 20px; } 
         #results-area strong { color: var(--primary-purple-light); }
@@ -48,7 +48,7 @@
 <body>
 
     <div class="container" id="login-container">
-        <h1><span class="robot">🤖</span> ورود بـــه دستیار سئو</h1>
+        <h1><span class="robot">🤖</span> ورود به دستیار سئو</h1>
         <p>برای استفاده از ابزار، لطفاً وارد شوید.</p>
         <form id="login-form" style="margin-top: 2rem;">
             <input type="text" id="username" placeholder="نام کاربری" required>
@@ -70,11 +70,10 @@
             <div id="model-selector-area">
                 <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
                 <select id="model-selector">
-                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
-                    <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
-                    <option value="huggingface-custom">Hugging Face (مدل سفارشی)</option>
+                    <option value="gemini/1.5-flash">Google Gemini 1.5 Flash (سریع)</option>
+                    <option value="groq/llama3-8b-8192">Groq Llama 3 8B (بسیار سریع)</option>
+                    <option value="huggingface/google/gemma-2-9b-it">Hugging Face Gemma 2 (باکیفیت)</option>
                 </select>
-                <input type="text" id="huggingface-model-id" class="hidden" placeholder="شناسه مدل هاگینگ فیس را وارد کنید..." style="margin-top: 1rem;">
             </div>
 
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
@@ -151,8 +150,7 @@
               regenerateOutlineBtn = document.getElementById('regenerate-outline-btn'),
               approveOutlineBtn = document.getElementById('approve-outline-btn'),
               useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox'),
-              modelSelector = document.getElementById('model-selector'),
-              huggingfaceModelInput = document.getElementById('huggingface-model-id');
+              modelSelector = document.getElementById('model-selector');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
@@ -170,31 +168,9 @@
         regenerateOutlineBtn.addEventListener('click', refineOutline);
         approveOutlineBtn.addEventListener('click', approveOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
-        
-        // --- کد جدید: نمایش/مخفی کردن کادر ورودی هاگینگ فیس ---
-        modelSelector.addEventListener('change', () => {
-            if (modelSelector.value === 'huggingface-custom') {
-                huggingfaceModelInput.classList.remove('hidden');
-            } else {
-                huggingfaceModelInput.classList.add('hidden');
-            }
-        });
 
-        // --- تابع جدید: برای خواندن مدل انتخاب شده به صورت هوشمند ---
-        function getSelectedModel() {
-            let modelId = modelSelector.value;
-            if (modelId === 'huggingface-custom') {
-                const hfModelId = huggingfaceModelInput.value.trim();
-                if (!hfModelId) {
-                    // اگر کاربر مدل سفارشی را انتخاب کرده ولی فیلد خالی است، خطا می‌دهیم
-                    statusDiv.textContent = 'لطفاً شناسه مدل Hugging Face را وارد کنید.';
-                    return null; // برگرداندن مقدار null برای نشان دادن خطا
-                }
-                return hfModelId; // شناسه مدل وارد شده توسط کاربر را برمی‌گردانیم
-            }
-            return modelId; // برای سایر مدل‌ها، مقدار خود dropdown را برمی‌گردانیم
-        }
-        
+        // --- توابع اجرایی ---
+
         async function handleLogin(e) {
             e.preventDefault();
             loginStatus.textContent = '';
@@ -264,12 +240,7 @@
             const rowData = allRows[selectedRowIndex];
             briefData = { headers: headers, rowData: rowData };
             const useGoogleSearch = useGoogleSearchCheckbox.checked;
-            
-            const selectedModel = getSelectedModel();
-            if (!selectedModel) { // اگر مدل خالی باشد (به خاطر خطای ورودی هاگینگ فیس)، تابع را متوقف کن
-                getSuggestionsBtn.disabled = false;
-                return;
-            }
+            const selectedModel = modelSelector.value;
             
             statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
             loader.style.display = 'block';
@@ -306,12 +277,7 @@
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
             if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
-
-            const selectedModel = getSelectedModel();
-            if (!selectedModel) {
-                outlineSubmitBtn.disabled = false;
-                return;
-            }
+            const selectedModel = modelSelector.value;
             
             statusDiv.textContent = `در حال ارسال درخواست برای تولید سرفصل...`;
             loader.style.display = 'block';
@@ -342,13 +308,8 @@
         async function refineOutline() {
             const refinement_prompt = refinementPromptInput.value;
             if (!refinement_prompt) { alert('لطفاً دستورالعمل اصلاحی خود را وارد کنید.'); return; }
-            
-            const selectedModel = getSelectedModel();
-            if (!selectedModel) {
-                regenerateOutlineBtn.disabled = false;
-                return;
-            }
-            
+            const selectedModel = modelSelector.value;
+
             statusDiv.textContent = `در حال ارسال درخواست برای اصلاح سرفصل...`;
             loader.style.display = 'block';
             regenerateOutlineBtn.disabled = true;
@@ -371,7 +332,6 @@
                 statusDiv.textContent = "سرفصل‌ها با موفقیت اصلاح شد.";
                 refinementPromptInput.value = '';
                 refinementControls.classList.add('hidden');
-_
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
             finally { loader.style.display = 'none'; regenerateOutlineBtn.disabled = false; }
         }
@@ -383,11 +343,7 @@ _
         }
 
         async function generateFullArticle() {
-            const selectedModel = getSelectedModel();
-            if (!selectedModel) {
-                generateArticleBtn.disabled = false;
-                return;
-            }
+            const selectedModel = modelSelector.value;
             
             statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
