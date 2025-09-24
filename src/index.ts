@@ -1,127 +1,98 @@
-// یک تابع کمکی ساده برای پاک‌سازی HTML و تبدیل آن به متن خام
-function stripHtml(html: string): string {
-    if (!html) return "";
-    let clean = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, '');
-    clean = clean.replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, '');
-    clean = clean.replace(/<\/div>|<\/li>|<\/ul>|<\/p>|<br\s*[\/]?>/ig, '\n');
-    clean = clean.replace(/<li>/ig, '  * ');
-    clean = clean.replace(/<[^>]+>/ig, '');
-    clean = clean.replace(/(\r\n|\n|\r){2,}/gm, '\n').trim();
-    return clean;
-}
+// --- Helper Functions (No Change) ---
+function stripHtml(html: string): string { if (!html) return ""; let clean = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, ''); clean = clean.replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, ''); clean = clean.replace(/<\/div>|<\/li>|<\/ul>|<\/p>|<br\s*[\/]?>/ig, '\n'); clean = clean.replace(/<li>/ig, '  * '); clean = clean.replace(/<[^>]+>/ig, ''); clean = clean.replace(/(\r\n|\n|\r){2,}/gm, '\n').trim(); return clean; }
+function findInBrief(brief: any, keys: string[]): string | null { if (!brief || !brief.headers || !brief.rowData) return null; for (let i = 0; i < brief.headers.length; i++) { const header = brief.headers[i]; if (header && typeof header === 'string') { const lowerHeader = header.trim().toLowerCase(); for (const key of keys) { if (lowerHeader.includes(key)) { return brief.rowData[i]; } } } } return null; }
+function getStructuredBrief(brief: any): string { if (!brief || !brief.headers || !brief.rowData) return ""; let structuredBrief = ""; for (let i = 0; i < brief.headers.length; i++) { structuredBrief += `- ${brief.headers[i] || 'ستون خالی'}: ${brief.rowData[i] || 'داده خالی'}\n`; } return structuredBrief; }
+function parseMainHeadings(outline: string): string[] { if (!outline) return []; return outline.split('\n').filter(line => line.trim().startsWith('## ')); }
+function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function countWords(text: string): number { if (!text) return 0; return text.trim().split(/\s+/).length; }
 
-// توابع کمکی برای خواندن بریف
-function findInBrief(brief: any, keys: string[]): string | null {
-    if (!brief || !brief.headers || !brief.rowData) return null;
-    for (let i = 0; i < brief.headers.length; i++) {
-        const header = brief.headers[i];
-        if (header && typeof header === 'string') {
-            const lowerHeader = header.trim().toLowerCase();
-            for (const key of keys) {
-                if (lowerHeader.includes(key)) {
-                    return brief.rowData[i];
-                }
-            }
-        }
-    }
-    return null;
-}
-
-function getStructuredBrief(brief: any): string {
-    if (!brief || !brief.headers || !brief.rowData) return "";
-    let structuredBrief = "";
-    for (let i = 0; i < brief.headers.length; i++) {
-        structuredBrief += `- ${brief.headers[i] || 'ستون خالی'}: ${brief.rowData[i] || 'داده خالی'}\n`;
-    }
-    return structuredBrief;
-}
-
-function parseMainHeadings(outline: string): string[] {
-    if (!outline) return [];
-    return outline.split('\n').filter(line => line.trim().startsWith('## '));
-}
-
-function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function countWords(text: string): number {
-    if (!text) return 0;
-    return text.trim().split(/\s+/).length;
-}
-
-// --- تابع generateContent با منطق Fallback آپدیت شده است ---
+// --- The 'generateContent' function is updated with Claude 3.5 Sonnet ---
 async function generateContent(prompt: string, model: string, env: Env): Promise<string> {
     const selectedModel = model || 'gemini-1.5-flash';
 
-    if (selectedModel.startsWith('gemini')) {
-        // لیست کلیدهای Gemini به ترتیب اولویت
-        const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key); // کلیدهای ناموجود را حذف می‌کند
-
-        for (const key of geminiKeys) {
-            try {
-                const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
-                const response = await fetch(GEMINI_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { maxOutputTokens: 8192 }
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Key failed with status ${response.status}: ${errorText}`);
+    switch (selectedModel) {
+        case 'gemini-1.5-flash': {
+            const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key);
+            for (const key of geminiKeys) {
+                try {
+                    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
+                    const response = await fetch(GEMINI_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { maxOutputTokens: 8192 }
+                        }),
+                    });
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Key failed with status ${response.status}: ${errorText}`);
+                    }
+                    const data: any = await response.json();
+                    return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
+                } catch (error) {
+                    console.error(`Attempt with a Gemini key failed:`, error);
                 }
-
-                const data: any = await response.json();
-                // در صورت موفقیت، نتیجه را برگردانده و از حلقه خارج می‌شود
-                return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
-
-            } catch (error) {
-                console.error(`Attempt with a Gemini key failed:`, error);
-                // خطا لاگ می‌شود و حلقه به صورت خودکار سراغ کلید بعدی می‌رود
             }
+            throw new Error("All available Gemini API keys failed.");
         }
-        // اگر حلقه تمام شود و هیچ کلیدی موفق نباشد، خطای نهایی ارسال می‌شود
-        throw new Error("All available Gemini API keys failed.");
 
-    } else {
-        const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-        const response = await fetch(GROQ_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${env.GROQ_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                messages: [{ role: 'user', content: prompt }],
-                model: 'openai/gpt-oss-20b',
-                max_tokens: 4096
-            }),
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Groq API Error: ${errorText}`);
+        case 'groq-gpt-oss-20b': { 
+            const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+            const response = await fetch(GROQ_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messages: [{ role: 'user', content: prompt }],
+                    model: 'qwen/qwen3-32b',
+                    max_tokens: 4096 
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Groq API Error: ${errorText}`);
+            }
+            const data: any = await response.json();
+            return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
         }
-        const data: any = await response.json();
-        return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
+
+        // --- NEW: Case for Claude 3.5 Sonnet ---
+        case 'claude-3.5-sonnet': {
+            const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+            const response = await fetch(ANTHROPIC_API_URL, {
+                method: 'POST',
+                headers: {
+                    'x-api-key': env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20240620',
+                    max_tokens: 4096,
+                    messages: [{ role: 'user', content: prompt }],
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Anthropic API Error: ${errorText}`);
+            }
+            const data: any = await response.json();
+            return data.content?.[0]?.text || "پاسخی از Claude دریافت نشد.";
+        }
+
+        default:
+            throw new Error(`مدل انتخاب شده نامعتبر است: ${selectedModel}`);
     }
 }
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
-
-        if (request.method === 'OPTIONS') {
-            return new Response(null, { headers: corsHeaders });
-        }
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
+        if (request.method === 'OPTIONS') { return new Response(null, { headers: corsHeaders }); }
 
         if (request.method === 'POST') {
             try {
@@ -280,12 +251,13 @@ ${current_heading}
     },
 };
 
-// --- این بخش برای اضافه کردن کلید دوم آپدیت شده است ---
+// --- The 'Env' interface is updated for the Claude API Key ---
 interface Env {
     USERS: KVNamespace;
     GEMINI_API_KEY: string;
-    GEMINI_API_KEY_SECONDARY: string; // کلید پشتیبان
+    GEMINI_API_KEY_SECONDARY: string;
     GOOGLE_API_KEY: string;
     GOOGLE_CSE_ID: string;
-    GROQ_API_KEY: string; 
+    GROQ_API_KEY: string;
+    ANTHROPIC_API_KEY: string; // New key for Claude
 }
