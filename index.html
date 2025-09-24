@@ -67,13 +67,14 @@
         <div id="interaction-area" class="hidden">
             <hr style="border-color: var(--border-color); margin: 2rem 0;">
 
-<div id="model-selector-area">
-    <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
-    <select id="model-selector">
-        <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
-        <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option> 
-    </select>
-</div>
+            <div id="model-selector-area">
+                <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
+                <select id="model-selector">
+                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
+                    <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
+                    <option value="claude-3.5-sonnet">Anthropic Claude 3.5 Sonnet (باکیفیت)</option>
+                </select>
+            </div>
 
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
             <div id="row-selector-area" class="hidden"><label for="row-selector">۲. ردیف حاوی بریف را انتخاب کنید:</label><select id="row-selector"></select></div>
@@ -149,7 +150,6 @@
               regenerateOutlineBtn = document.getElementById('regenerate-outline-btn'),
               approveOutlineBtn = document.getElementById('approve-outline-btn'),
               useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox'),
-              // متغیر جدید: انتخاب‌گر مدل
               modelSelector = document.getElementById('model-selector');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
@@ -169,7 +169,7 @@
         approveOutlineBtn.addEventListener('click', approveOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
 
-        // --- توابع اجرایی ---
+        // --- توابع اجرایی (این بخش بدون تغییر است) ---
 
         async function handleLogin(e) { /* بدون تغییر */
             e.preventDefault();
@@ -240,7 +240,7 @@
             const rowData = allRows[selectedRowIndex];
             briefData = { headers: headers, rowData: rowData };
             const useGoogleSearch = useGoogleSearchCheckbox.checked;
-            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            const selectedModel = modelSelector.value;
             statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
             loader.style.display = 'block';
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
@@ -252,7 +252,7 @@
                         task: 'get_title_suggestions', 
                         brief: briefData,
                         use_google_search: useGoogleSearch,
-                        model: selectedModel // ارسال مدل انتخاب شده
+                        model: selectedModel
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -276,7 +276,7 @@
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
             if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
-            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            const selectedModel = modelSelector.value;
             statusDiv.textContent = `در حال ارسال درخواست برای تولید سرفصل...`;
             loader.style.display = 'block';
             choiceArea.classList.add('hidden');
@@ -289,7 +289,7 @@
                         brief: briefData, 
                         top_titles: sourceTitles, 
                         final_title: finalApprovedTitle,
-                        model: selectedModel // ارسال مدل انتخاب شده
+                        model: selectedModel
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -306,7 +306,7 @@
         async function refineOutline() {
             const refinement_prompt = refinementPromptInput.value;
             if (!refinement_prompt) { alert('لطفاً دستورالعمل اصلاحی خود را وارد کنید.'); return; }
-            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            const selectedModel = modelSelector.value;
             statusDiv.textContent = `در حال ارسال درخواست برای اصلاح سرفصل...`;
             loader.style.display = 'block';
             try {
@@ -318,7 +318,7 @@
                         final_title: finalApprovedTitle, 
                         outline: currentOutline, 
                         refinement_prompt: refinement_prompt,
-                        model: selectedModel // ارسال مدل انتخاب شده
+                        model: selectedModel
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -339,7 +339,7 @@
         }
 
         async function generateFullArticle() {
-            const selectedModel = modelSelector.value; // خواندن مدل انتخاب شده
+            const selectedModel = modelSelector.value;
             statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
             generateArticleBtn.disabled = true;
@@ -351,7 +351,7 @@
                         brief: briefData, 
                         final_title: finalApprovedTitle, 
                         outline: currentOutline,
-                        model: selectedModel // ارسال مدل انتخاب شده
+                        model: selectedModel
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
