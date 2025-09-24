@@ -67,15 +67,15 @@
         <div id="interaction-area" class="hidden">
             <hr style="border-color: var(--border-color); margin: 2rem 0;">
 
-                <div id="model-selector-area">
-                    <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
-                        <select id="model-selector">
-                        <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
-                        <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
-                        <option value="huggingface-custom">Hugging Face (مدل سفارشی)</option>
-                        </select>
-                    <input type="text" id="huggingface-model-id" class="hidden" placeholder="شناسه مدل هاگینگ فیس را وارد کنید...">
-                </div>
+            <div id="model-selector-area">
+                <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
+                <select id="model-selector">
+                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
+                    <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
+                    <option value="huggingface-custom">Hugging Face (مدل سفارشی)</option>
+                </select>
+                <input type="text" id="huggingface-model-id" class="hidden" placeholder="شناسه مدل هاگینگ فیس را وارد کنید..." style="margin-top: 1rem;">
+            </div>
 
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
             <div id="row-selector-area" class="hidden"><label for="row-selector">۲. ردیف حاوی بریف را انتخاب کنید:</label><select id="row-selector"></select></div>
@@ -152,7 +152,6 @@
               approveOutlineBtn = document.getElementById('approve-outline-btn'),
               useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox'),
               modelSelector = document.getElementById('model-selector'),
-              // --- [تغییر ۱] --- متغیر جدید برای اینپوت هاگینگ فیس
               huggingfaceModelInput = document.getElementById('huggingface-model-id');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
@@ -172,7 +171,7 @@
         approveOutlineBtn.addEventListener('click', approveOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
         
-        // --- [تغییر ۲] --- افزودن Event Listener برای انتخاب مدل
+        // --- کد جدید: نمایش/مخفی کردن کادر ورودی هاگینگ فیس ---
         modelSelector.addEventListener('change', () => {
             if (modelSelector.value === 'huggingface-custom') {
                 huggingfaceModelInput.classList.remove('hidden');
@@ -181,9 +180,22 @@
             }
         });
 
-        // --- توابع اجرایی (این بخش بدون تغییر است) ---
-
-        async function handleLogin(e) { /* بدون تغییر */
+        // --- تابع جدید: برای خواندن مدل انتخاب شده به صورت هوشمند ---
+        function getSelectedModel() {
+            let modelId = modelSelector.value;
+            if (modelId === 'huggingface-custom') {
+                const hfModelId = huggingfaceModelInput.value.trim();
+                if (!hfModelId) {
+                    // اگر کاربر مدل سفارشی را انتخاب کرده ولی فیلد خالی است، خطا می‌دهیم
+                    statusDiv.textContent = 'لطفاً شناسه مدل Hugging Face را وارد کنید.';
+                    return null; // برگرداندن مقدار null برای نشان دادن خطا
+                }
+                return hfModelId; // شناسه مدل وارد شده توسط کاربر را برمی‌گردانیم
+            }
+            return modelId; // برای سایر مدل‌ها، مقدار خود dropdown را برمی‌گردانیم
+        }
+        
+        async function handleLogin(e) {
             e.preventDefault();
             loginStatus.textContent = '';
             loginLoader.classList.remove('hidden');
@@ -206,7 +218,7 @@
             }
         }
         
-        async function handleFileSelect(event) { /* بدون تغییر */
+        async function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
             fileNameSpan.textContent = `فایل انتخاب شده: ${file.name}`;
@@ -225,7 +237,7 @@
             finally { loader.style.display = 'none'; }
         }
 
-        function handleSheetSelect() { /* بدون تغییر */
+        function handleSheetSelect() {
             const selectedSheetName = sheetSelector.value;
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
             if (!selectedSheetName) {
@@ -252,18 +264,13 @@
             const rowData = allRows[selectedRowIndex];
             briefData = { headers: headers, rowData: rowData };
             const useGoogleSearch = useGoogleSearchCheckbox.checked;
-            // --- [تغییر ۳] --- اضافه کردن مقدار اینپوت هاگینگ فیس در صورت انتخاب
-            const selectedModel = modelSelector.value;
-            let modelPayload = selectedModel;
-            if (selectedModel === 'huggingface-custom') {
-                const modelId = huggingfaceModelInput.value;
-                if (!modelId) {
-                    alert('لطفاً شناسه مدل هاگینگ فیس را وارد کنید.');
-                    return;
-                }
-                modelPayload = `huggingface-custom:${modelId}`;
+            
+            const selectedModel = getSelectedModel();
+            if (!selectedModel) { // اگر مدل خالی باشد (به خاطر خطای ورودی هاگینگ فیس)، تابع را متوقف کن
+                getSuggestionsBtn.disabled = false;
+                return;
             }
-
+            
             statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
             loader.style.display = 'block';
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
@@ -275,7 +282,7 @@
                         task: 'get_title_suggestions', 
                         brief: briefData,
                         use_google_search: useGoogleSearch,
-                        model: modelPayload // ارسال مدل به همراه شناسه سفارشی در صورت نیاز
+                        model: selectedModel
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -299,13 +306,13 @@
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
             if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
-            // --- [تغییر ۴] --- منطق مشابه برای ارسال مدل
-            const selectedModel = modelSelector.value;
-            let modelPayload = selectedModel;
-            if (selectedModel === 'huggingface-custom') {
-                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
-            }
 
+            const selectedModel = getSelectedModel();
+            if (!selectedModel) {
+                outlineSubmitBtn.disabled = false;
+                return;
+            }
+            
             statusDiv.textContent = `در حال ارسال درخواست برای تولید سرفصل...`;
             loader.style.display = 'block';
             choiceArea.classList.add('hidden');
@@ -318,7 +325,7 @@
                         brief: briefData, 
                         top_titles: sourceTitles, 
                         final_title: finalApprovedTitle,
-                        model: modelPayload
+                        model: selectedModel
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -329,21 +336,22 @@
                 refinementArea.classList.remove('hidden');
                 refinementControls.classList.add('hidden');
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
-            finally { loader.style.display = 'none'; }
+            finally { loader.style.display = 'none'; outlineSubmitBtn.disabled = false; }
         }
 
         async function refineOutline() {
             const refinement_prompt = refinementPromptInput.value;
             if (!refinement_prompt) { alert('لطفاً دستورالعمل اصلاحی خود را وارد کنید.'); return; }
-            // --- [تغییر ۵] --- منطق مشابه برای ارسال مدل
-             const selectedModel = modelSelector.value;
-            let modelPayload = selectedModel;
-            if (selectedModel === 'huggingface-custom') {
-                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
+            
+            const selectedModel = getSelectedModel();
+            if (!selectedModel) {
+                regenerateOutlineBtn.disabled = false;
+                return;
             }
-
+            
             statusDiv.textContent = `در حال ارسال درخواست برای اصلاح سرفصل...`;
             loader.style.display = 'block';
+            regenerateOutlineBtn.disabled = true;
             try {
                 const response = await fetch(WORKER_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -353,7 +361,7 @@
                         final_title: finalApprovedTitle, 
                         outline: currentOutline, 
                         refinement_prompt: refinement_prompt,
-                        model: modelPayload
+                        model: selectedModel
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -363,23 +371,24 @@
                 statusDiv.textContent = "سرفصل‌ها با موفقیت اصلاح شد.";
                 refinementPromptInput.value = '';
                 refinementControls.classList.add('hidden');
+_
             } catch (error) { statusDiv.textContent = `متاسفانه خطایی رخ داد: ${error.message}`; } 
-            finally { loader.style.display = 'none'; }
+            finally { loader.style.display = 'none'; regenerateOutlineBtn.disabled = false; }
         }
 
-        function approveOutline() { /* بدون تغییر */
+        function approveOutline() {
             statusDiv.textContent = `سرفصل‌ها تایید شد. آماده برای تولید مقاله کامل.`;
             refinementArea.classList.add('hidden');
             finalActionArea.classList.remove('hidden');
         }
 
         async function generateFullArticle() {
-            // --- [تغییر ۶] --- منطق مشابه برای ارسال مدل
-            const selectedModel = modelSelector.value;
-            let modelPayload = selectedModel;
-            if (selectedModel === 'huggingface-custom') {
-                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
+            const selectedModel = getSelectedModel();
+            if (!selectedModel) {
+                generateArticleBtn.disabled = false;
+                return;
             }
+            
             statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
             generateArticleBtn.disabled = true;
@@ -391,7 +400,7 @@
                         brief: briefData, 
                         final_title: finalApprovedTitle, 
                         outline: currentOutline,
-                        model: modelPayload
+                        model: selectedModel
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
