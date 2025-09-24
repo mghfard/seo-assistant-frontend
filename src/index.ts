@@ -6,78 +6,71 @@ function parseMainHeadings(outline: string): string[] { if (!outline) return [];
 function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function countWords(text: string): number { if (!text) return 0; return text.trim().split(/\s+/).length; }
 
-// --- تابع generateContent با اضافه شدن Hugging Face آپدیت شده است ---
-async function generateContent(prompt: string, model: string, env: Env): Promise<string> {
-    const selectedModel = model || 'gemini-1.5-flash';
+// --- تابع generateContent با منطق اصلاح شده برای Hugging Face ---
+async function generateContent(modelId: string, prompt: string, env: Env): Promise<string> {
+    const [service, ...modelParts] = modelId.split('/');
+    const modelName = modelParts.join('/');
 
-    if (selectedModel.startsWith('gemini')) {
-        const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key);
-        for (const key of geminiKeys) {
-            try {
-                const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
-                const response = await fetch(GEMINI_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { maxOutputTokens: 8192 }
-                    }),
-                });
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Key failed with status ${response.status}: ${errorText}`);
+    switch (service) {
+        case 'gemini': {
+            const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key);
+            for (const key of geminiKeys) {
+                try {
+                    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}-latest:generateContent?key=${key}`;
+                    const response = await fetch(GEMINI_API_URL, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { maxOutputTokens: 8192 }
+                        }),
+                    });
+                    if (!response.ok) throw new Error(await response.text());
+                    const data: any = await response.json();
+                    return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
+                } catch (error) {
+                    console.error(`Attempt with a Gemini key failed:`, error);
                 }
-                const data: any = await response.json();
-                return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
-            } catch (error) {
-                console.error(`Attempt with a Gemini key failed:`, error);
             }
+            throw new Error("All available Gemini API keys failed.");
         }
-        throw new Error("All available Gemini API keys failed.");
-    } 
-    
-    else if (selectedModel.startsWith('groq')) { 
-        const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-        const response = await fetch(GROQ_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${env.GROQ_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                messages: [{ role: 'user', content: prompt }],
-                model: 'openai/gpt-oss-20b', // یا هر مدل دیگری که در Groq استفاده می‌کنید
-                max_tokens: 4096 
-            }),
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Groq API Error: ${errorText}`);
-        }
-        const data: any = await response.json();
-        return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
-    }
 
-    else { // در غیر این صورت، فرض می‌شود مدل برای Hugging Face است
-        const HUGGINGFACE_API_URL = `https://api-inference.huggingface.co/models/${selectedModel}`;
-        const response = await fetch(HUGGINGFACE_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${env.HUGGINGFACE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                inputs: prompt,
-                parameters: { max_new_tokens: 2048 } // می‌توانید این مقدار را تغییر دهید
-            }),
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Hugging Face API Error: ${errorText}`);
+        case 'groq': {
+            const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+            const response = await fetch(GROQ_API_URL, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [{ role: 'user', content: prompt }],
+                    model: modelName,
+                    max_tokens: 4096
+                }),
+            });
+            if (!response.ok) throw new Error(await response.text());
+            const data: any = await response.json();
+            return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
         }
-        const data: any = await response.json();
-        // فرمت پاسخ Hugging Face معمولاً متفاوت است و ممکن است نیاز به تنظیم داشته باشد
-        return data[0]?.generated_text || `پاسخی از مدل ${selectedModel} دریافت نشد.`;
+
+        case 'huggingface': {
+            const HUGGINGFACE_API_URL = `https://api-inference.huggingface.co/models/${modelName}`;
+            const response = await fetch(HUGGINGFACE_API_URL, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${env.HUGGINGFACE_API_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    inputs: {
+                        messages: [{ "role": "user", "content": prompt }]
+                    },
+                    parameters: { max_new_tokens: 2048 }
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Hugging Face API Error: ${errorText}`);
+            }
+            const data: any = await response.json();
+            return data.choices?.[0]?.message?.content || `پاسخی از مدل ${modelName} دریافت نشد.`;
+        }
+
+        default:
+            throw new Error(`سرویس انتخاب شده نامعتبر است: ${service}`);
     }
 }
 
@@ -116,7 +109,7 @@ export default {
                     }
                     const titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}" and top 5 competitor titles:\n${topTitles.join('\n')}\nSuggest one new, superior, SEO-friendly title in Persian.`;
                     
-                    const aiSuggestedTitle = await generateContent(titlePrompt, model, env);
+                    const aiSuggestedTitle = await generateContent(model, titlePrompt, env);
 
                     return new Response(JSON.stringify({
                         original_topic: topic,
@@ -147,7 +140,7 @@ You are a professional SEO content creator. Your task is to generate a detailed 
 - The outline must be suitable for a ~${word_count} word article.
 - Return **ONLY** the Markdown outline.
 `;
-                    const generatedOutline = await generateContent(outlinePrompt, model, env);
+                    const generatedOutline = await generateContent(model, outlinePrompt, env);
                     return new Response(JSON.stringify({ generated_outline: generatedOutline }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
                 }
                 
@@ -175,7 +168,7 @@ YOUR TASK:
 - Maintain optimal structure: 3-5 H2 sections with 2-3 H3 subheadings each
 - Return ONLY the new, complete Markdown outline. Do not add any other commentary.
 `;
-                    const refinedOutline = await generateContent(refinePrompt, model, env);
+                    const refinedOutline = await generateContent(model, refinePrompt, env);
                     return new Response(JSON.stringify({ generated_outline: refinedOutline }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
                 }
                 
@@ -217,7 +210,7 @@ ${current_heading}
 - Your response must start directly with the heading (e.g., "${current_heading}").
 - Maintain a professional tone consistent with the previous section summary: "${previous_section_summary}"
 `;
-                        const section_content = await generateContent(section_prompt, model, env);
+                        const section_content = await generateContent(model, section_prompt, env);
                         
                         full_article += section_content + "\n\n";
                         words_written_so_far += countWords(section_content);
@@ -248,7 +241,6 @@ ${current_heading}
     },
 };
 
-// --- اینترفیس Env برای اضافه کردن کلید هاگینگ فیس آپدیت شده است ---
 interface Env {
     USERS: KVNamespace;
     GEMINI_API_KEY: string;
@@ -256,6 +248,5 @@ interface Env {
     GOOGLE_API_KEY: string;
     GOOGLE_CSE_ID: string;
     GROQ_API_KEY: string;
-    ANTHROPIC_API_KEY: string;
-    HUGGINGFACE_API_KEY: string; // کلید جدید برای هاگینگ فیس
+    HUGGINGFACE_API_KEY: string;
 }
