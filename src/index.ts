@@ -1,4 +1,4 @@
-// --- Helper Functions (No Change) ---
+// --- توابع کمکی ---
 function stripHtml(html: string): string { if (!html) return ""; let clean = html.replace(/<script[^>]*>([\S\s]*?)<\/script>/gmi, ''); clean = clean.replace(/<style[^>]*>([\S\s]*?)<\/style>/gmi, ''); clean = clean.replace(/<\/div>|<\/li>|<\/ul>|<\/p>|<br\s*[\/]?>/ig, '\n'); clean = clean.replace(/<li>/ig, '  * '); clean = clean.replace(/<[^>]+>/ig, ''); clean = clean.replace(/(\r\n|\n|\r){2,}/gm, '\n').trim(); return clean; }
 function findInBrief(brief: any, keys: string[]): string | null { if (!brief || !brief.headers || !brief.rowData) return null; for (let i = 0; i < brief.headers.length; i++) { const header = brief.headers[i]; if (header && typeof header === 'string') { const lowerHeader = header.trim().toLowerCase(); for (const key of keys) { if (lowerHeader.includes(key)) { return brief.rowData[i]; } } } } return null; }
 function getStructuredBrief(brief: any): string { if (!brief || !brief.headers || !brief.rowData) return ""; let structuredBrief = ""; for (let i = 0; i < brief.headers.length; i++) { structuredBrief += `- ${brief.headers[i] || 'ستون خالی'}: ${brief.rowData[i] || 'داده خالی'}\n`; } return structuredBrief; }
@@ -6,85 +6,78 @@ function parseMainHeadings(outline: string): string[] { if (!outline) return [];
 function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function countWords(text: string): number { if (!text) return 0; return text.trim().split(/\s+/).length; }
 
-// --- The 'generateContent' function is updated with Claude 3.5 Sonnet ---
+// --- تابع generateContent با اضافه شدن Hugging Face آپدیت شده است ---
 async function generateContent(prompt: string, model: string, env: Env): Promise<string> {
     const selectedModel = model || 'gemini-1.5-flash';
 
-    switch (selectedModel) {
-        case 'gemini-1.5-flash': {
-            const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key);
-            for (const key of geminiKeys) {
-                try {
-                    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
-                    const response = await fetch(GEMINI_API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: { maxOutputTokens: 8192 }
-                        }),
-                    });
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`Key failed with status ${response.status}: ${errorText}`);
-                    }
-                    const data: any = await response.json();
-                    return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
-                } catch (error) {
-                    console.error(`Attempt with a Gemini key failed:`, error);
+    if (selectedModel.startsWith('gemini')) {
+        const geminiKeys = [env.GEMINI_API_KEY, env.GEMINI_API_KEY_SECONDARY].filter(key => key);
+        for (const key of geminiKeys) {
+            try {
+                const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`;
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { maxOutputTokens: 8192 }
+                    }),
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Key failed with status ${response.status}: ${errorText}`);
                 }
+                const data: any = await response.json();
+                return data.candidates?.[0]?.content.parts?.[0]?.text || "پاسخی از Gemini دریافت نشد.";
+            } catch (error) {
+                console.error(`Attempt with a Gemini key failed:`, error);
             }
-            throw new Error("All available Gemini API keys failed.");
         }
-
-        case 'groq-gpt-oss-20b': { 
-            const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-            const response = await fetch(GROQ_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${env.GROQ_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    messages: [{ role: 'user', content: prompt }],
-                    model: 'qwen/qwen3-32b',
-                    max_tokens: 4096 
-                }),
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Groq API Error: ${errorText}`);
-            }
-            const data: any = await response.json();
-            return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
+        throw new Error("All available Gemini API keys failed.");
+    } 
+    
+    else if (selectedModel.startsWith('groq')) { 
+        const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+        const response = await fetch(GROQ_API_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messages: [{ role: 'user', content: prompt }],
+                model: 'openai/gpt-oss-20b', // یا هر مدل دیگری که در Groq استفاده می‌کنید
+                max_tokens: 4096 
+            }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Groq API Error: ${errorText}`);
         }
+        const data: any = await response.json();
+        return data.choices?.[0]?.message?.content || "پاسخی از Groq دریافت نشد.";
+    }
 
-        // --- NEW: Case for Claude 3.5 Sonnet ---
-        case 'claude-3.5-sonnet': {
-            const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-            const response = await fetch(ANTHROPIC_API_URL, {
-                method: 'POST',
-                headers: {
-                    'x-api-key': env.ANTHROPIC_API_KEY,
-                    'anthropic-version': '2023-06-01',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: 'claude-3-5-sonnet-20240620',
-                    max_tokens: 4096,
-                    messages: [{ role: 'user', content: prompt }],
-                }),
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Anthropic API Error: ${errorText}`);
-            }
-            const data: any = await response.json();
-            return data.content?.[0]?.text || "پاسخی از Claude دریافت نشد.";
+    else { // در غیر این صورت، فرض می‌شود مدل برای Hugging Face است
+        const HUGGINGFACE_API_URL = `https://api-inference.huggingface.co/models/${selectedModel}`;
+        const response = await fetch(HUGGINGFACE_API_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${env.HUGGINGFACE_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inputs: prompt,
+                parameters: { max_new_tokens: 2048 } // می‌توانید این مقدار را تغییر دهید
+            }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Hugging Face API Error: ${errorText}`);
         }
-
-        default:
-            throw new Error(`مدل انتخاب شده نامعتبر است: ${selectedModel}`);
+        const data: any = await response.json();
+        // فرمت پاسخ Hugging Face معمولاً متفاوت است و ممکن است نیاز به تنظیم داشته باشد
+        return data[0]?.generated_text || `پاسخی از مدل ${selectedModel} دریافت نشد.`;
     }
 }
 
@@ -121,9 +114,7 @@ export default {
                             topTitles = searchData.items?.map((item: any) => item.title) || [];
                         } else { console.error("Google Search API failed."); }
                     }
-                    let titlePrompt = topTitles.length > 0
-                        ? `You are an expert SEO copywriter. Based on the main topic "${topic}" and the top 5 competitor titles from Google search:\n${topTitles.join('\n')}\n\nSuggest one new, superior, and SEO-friendly title in Persian that can outperform them. Return only the title text.`
-                        : `You are an expert SEO copywriter. Based on the main topic "${topic}", suggest one creative and SEO-friendly title in Persian. Return only the title text.`;
+                    const titlePrompt = `You are an expert SEO copywriter. Based on the main topic "${topic}" and top 5 competitor titles:\n${topTitles.join('\n')}\nSuggest one new, superior, SEO-friendly title in Persian.`;
                     
                     const aiSuggestedTitle = await generateContent(titlePrompt, model, env);
 
@@ -139,17 +130,23 @@ export default {
                     if (!final_title || !brief) throw new Error("اطلاعات برای تولید سرفصل ناقص است.");
                     const structuredBrief = getStructuredBrief(brief);
                     const word_count = findInBrief(brief, ['word', 'count', 'کلمات', 'تعداد']) || '1500';
-                    const outlinePrompt = `You are an SEO expert. Create a detailed outline in Persian for a blog post. 
-CONTEXT: 
-- Title: "${final_title}" 
-- Brief: \n${structuredBrief} 
+                    const outlinePrompt = `
+You are a professional SEO content creator. Your task is to generate a detailed blog post outline in Persian.
+**CRITICAL INSTRUCTION:**
+- The outline **MUST** use Persian Markdown for headings.
+- Main headings **MUST** start with '## '.
+- Subheadings **MUST** start with '### '.
+- Do **NOT** use any other formatting for headings (like '*' or '-').
+**CONTEXT:**
+- Final Title: "${final_title}"
+- Content Brief: \n${structuredBrief}
 - Competitors: \n${(top_titles || []).join('\n')}
-
-INSTRUCTIONS: 
-- Use Persian Markdown (##, ###)
-- Create optimal structure: 3-5 H2 sections with 2-3 H3 subheadings each
-- The outline must support an article of ~${word_count} words
-- Return ONLY the Markdown outline`;
+**INSTRUCTIONS:**
+- Create an optimal structure with 3-5 main headings (H2s).
+- Each main heading should have 2-3 subheadings (H3s).
+- The outline must be suitable for a ~${word_count} word article.
+- Return **ONLY** the Markdown outline.
+`;
                     const generatedOutline = await generateContent(outlinePrompt, model, env);
                     return new Response(JSON.stringify({ generated_outline: generatedOutline }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
                 }
@@ -251,7 +248,7 @@ ${current_heading}
     },
 };
 
-// --- The 'Env' interface is updated for the Claude API Key ---
+// --- اینترفیس Env برای اضافه کردن کلید هاگینگ فیس آپدیت شده است ---
 interface Env {
     USERS: KVNamespace;
     GEMINI_API_KEY: string;
@@ -259,5 +256,6 @@ interface Env {
     GOOGLE_API_KEY: string;
     GOOGLE_CSE_ID: string;
     GROQ_API_KEY: string;
-    ANTHROPIC_API_KEY: string; // New key for Claude
+    ANTHROPIC_API_KEY: string;
+    HUGGINGFACE_API_KEY: string; // کلید جدید برای هاگینگ فیس
 }

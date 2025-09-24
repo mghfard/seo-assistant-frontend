@@ -67,14 +67,15 @@
         <div id="interaction-area" class="hidden">
             <hr style="border-color: var(--border-color); margin: 2rem 0;">
 
-            <div id="model-selector-area">
-                <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
-                <select id="model-selector">
-                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
-                    <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
-                    <option value="mistralai/Mistral-7B-Instruct-v0.2">Hugging Face (Mistral 7B)</option>
-                </select>
-            </div>
+                <div id="model-selector-area">
+                    <label for="model-selector">هسته هوش مصنوعی را انتخاب کنید:</label>
+                        <select id="model-selector">
+                        <option value="gemini-1.5-flash">Google Gemini 1.5 Flash</option>
+                        <option value="groq-gpt-oss-20b">Groq GPT-OSS 20B (پایدار)</option>
+                        <option value="huggingface-custom">Hugging Face (مدل سفارشی)</option>
+                        </select>
+                    <input type="text" id="huggingface-model-id" class="hidden" placeholder="شناسه مدل هاگینگ فیس را وارد کنید...">
+                </div>
 
             <div id="sheet-selector-area"><label for="sheet-selector">۱. شیت مورد نظر را انتخاب کنید:</label><select id="sheet-selector"></select></div>
             <div id="row-selector-area" class="hidden"><label for="row-selector">۲. ردیف حاوی بریف را انتخاب کنید:</label><select id="row-selector"></select></div>
