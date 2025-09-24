@@ -151,7 +151,9 @@
               regenerateOutlineBtn = document.getElementById('regenerate-outline-btn'),
               approveOutlineBtn = document.getElementById('approve-outline-btn'),
               useGoogleSearchCheckbox = document.getElementById('use-google-search-checkbox'),
-              modelSelector = document.getElementById('model-selector');
+              modelSelector = document.getElementById('model-selector'),
+              // --- [تغییر ۱] --- متغیر جدید برای اینپوت هاگینگ فیس
+              huggingfaceModelInput = document.getElementById('huggingface-model-id');
         
         let workbook, headers, allRows, briefData, sourceTitles, aiSuggestedTitle, finalApprovedTitle, currentOutline;
         const WORKER_URL = 'https://seo-assistant-worker.mghfardbehinava.workers.dev';
@@ -169,6 +171,15 @@
         regenerateOutlineBtn.addEventListener('click', refineOutline);
         approveOutlineBtn.addEventListener('click', approveOutline);
         generateArticleBtn.addEventListener('click', generateFullArticle);
+        
+        // --- [تغییر ۲] --- افزودن Event Listener برای انتخاب مدل
+        modelSelector.addEventListener('change', () => {
+            if (modelSelector.value === 'huggingface-custom') {
+                huggingfaceModelInput.classList.remove('hidden');
+            } else {
+                huggingfaceModelInput.classList.add('hidden');
+            }
+        });
 
         // --- توابع اجرایی (این بخش بدون تغییر است) ---
 
@@ -241,7 +252,18 @@
             const rowData = allRows[selectedRowIndex];
             briefData = { headers: headers, rowData: rowData };
             const useGoogleSearch = useGoogleSearchCheckbox.checked;
+            // --- [تغییر ۳] --- اضافه کردن مقدار اینپوت هاگینگ فیس در صورت انتخاب
             const selectedModel = modelSelector.value;
+            let modelPayload = selectedModel;
+            if (selectedModel === 'huggingface-custom') {
+                const modelId = huggingfaceModelInput.value;
+                if (!modelId) {
+                    alert('لطفاً شناسه مدل هاگینگ فیس را وارد کنید.');
+                    return;
+                }
+                modelPayload = `huggingface-custom:${modelId}`;
+            }
+
             statusDiv.textContent = 'درخواست پیشنهاد عنوان ارسال شد...';
             loader.style.display = 'block';
             [resultsArea, choiceArea, refinementArea, finalActionArea].forEach(el => el.classList.add('hidden'));
@@ -253,7 +275,7 @@
                         task: 'get_title_suggestions', 
                         brief: briefData,
                         use_google_search: useGoogleSearch,
-                        model: selectedModel
+                        model: modelPayload // ارسال مدل به همراه شناسه سفارشی در صورت نیاز
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -277,7 +299,13 @@
         async function generateOutline() {
             finalApprovedTitle = aiChoiceRadio.checked ? aiSuggestedTitle : customTitleInput.value;
             if (!finalApprovedTitle) { alert('لطفاً یک عنوان را انتخاب یا وارد کنید.'); return; }
+            // --- [تغییر ۴] --- منطق مشابه برای ارسال مدل
             const selectedModel = modelSelector.value;
+            let modelPayload = selectedModel;
+            if (selectedModel === 'huggingface-custom') {
+                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
+            }
+
             statusDiv.textContent = `در حال ارسال درخواست برای تولید سرفصل...`;
             loader.style.display = 'block';
             choiceArea.classList.add('hidden');
@@ -290,7 +318,7 @@
                         brief: briefData, 
                         top_titles: sourceTitles, 
                         final_title: finalApprovedTitle,
-                        model: selectedModel
+                        model: modelPayload
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -307,7 +335,13 @@
         async function refineOutline() {
             const refinement_prompt = refinementPromptInput.value;
             if (!refinement_prompt) { alert('لطفاً دستورالعمل اصلاحی خود را وارد کنید.'); return; }
-            const selectedModel = modelSelector.value;
+            // --- [تغییر ۵] --- منطق مشابه برای ارسال مدل
+             const selectedModel = modelSelector.value;
+            let modelPayload = selectedModel;
+            if (selectedModel === 'huggingface-custom') {
+                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
+            }
+
             statusDiv.textContent = `در حال ارسال درخواست برای اصلاح سرفصل...`;
             loader.style.display = 'block';
             try {
@@ -319,7 +353,7 @@
                         final_title: finalApprovedTitle, 
                         outline: currentOutline, 
                         refinement_prompt: refinement_prompt,
-                        model: selectedModel
+                        model: modelPayload
                     })
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
@@ -340,7 +374,12 @@
         }
 
         async function generateFullArticle() {
+            // --- [تغییر ۶] --- منطق مشابه برای ارسال مدل
             const selectedModel = modelSelector.value;
+            let modelPayload = selectedModel;
+            if (selectedModel === 'huggingface-custom') {
+                 modelPayload = `huggingface-custom:${huggingfaceModelInput.value}`;
+            }
             statusDiv.textContent = 'درخواست نهایی برای تولید مقاله کامل ارسال شد...';
             loader.style.display = 'block';
             generateArticleBtn.disabled = true;
@@ -352,7 +391,7 @@
                         brief: briefData, 
                         final_title: finalApprovedTitle, 
                         outline: currentOutline,
-                        model: selectedModel
+                        model: modelPayload
                     }) 
                 });
                 if (!response.ok) { const d = await response.json(); throw new Error(d.error); }
